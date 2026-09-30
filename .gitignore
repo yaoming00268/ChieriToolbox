@@ -1,0 +1,46 @@
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# IDE & Editor files
+.idea/
+.vscode/
+.vs/
+*.swp
+*.swo
+
+# PyInstaller & Build artifacts
+build/
+dist/
+*.manifest
+*.spec.bak
+
+# Test artifacts & logs
+*.log
+*.tmp
+*.m4s
+*.bak
+test_*.txt
+smoke_test_report.json
+.pytest_cache/
+tests/ui_screenshots/
+tests/.media_cache/
+verified_*.png
+output/
+
+# Local configurations
+toolbox_config.json
+*.local.json
+
+# Large external binaries (>100MB, distributed via Releases)
+bin/ffmpeg.exe
+bin/ffplay.exe
+bin/ffprobe.exe
