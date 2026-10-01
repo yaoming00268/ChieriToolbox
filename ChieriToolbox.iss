@@ -5,7 +5,7 @@
 [Setup]
 AppId={{C3F719E8-5182-4EAE-A3C9-1234567890AB}}
 AppName=千绘莉多功能工具箱
-AppVersion=1.3.0
+AppVersion=2.0.0
 AppPublisher=Chieri
 AppPublisherURL=https://github.com/chieri-toolbox
 AppSupportURL=https://github.com/chieri-toolbox

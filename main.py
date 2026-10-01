@@ -14,13 +14,37 @@ import traceback
 if sys.platform == "win32" and len(sys.argv) > 1:
     try:
         import ctypes
-        # 若从 CMD 或 PowerShell 等已有终端启动，自动挂载到父进程控制台
-        if ctypes.windll.kernel32.AttachConsole(-1):
-            try:
-                sys.stdout = open("CONOUT$", "w", encoding="utf-8", errors="replace")
-                sys.stderr = open("CONOUT$", "w", encoding="utf-8", errors="replace")
-            except Exception:
-                pass
+        kernel32 = ctypes.windll.kernel32
+        h_stdout = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+        h_stderr = kernel32.GetStdHandle(-12)  # STD_ERROR_HANDLE
+        type_stdout = kernel32.GetFileType(h_stdout) if h_stdout else 0
+        # FILE_TYPE_CHAR = 2, FILE_TYPE_PIPE = 3, FILE_TYPE_DISK = 1
+        if type_stdout in (1, 3):
+            # 标准输出被管道或文件重定向 (如 subprocess capture_output 或 shell 重定向)
+            if sys.stdout is None:
+                import io
+                import msvcrt
+                try:
+                    fd_out = msvcrt.open_osfhandle(h_stdout, 0)
+                    sys.stdout = io.TextIOWrapper(open(fd_out, "wb", closefd=False), encoding="utf-8", errors="replace")
+                except Exception:
+                    pass
+            if sys.stderr is None:
+                import io
+                import msvcrt
+                try:
+                    fd_err = msvcrt.open_osfhandle(h_stderr, 0)
+                    sys.stderr = io.TextIOWrapper(open(fd_err, "wb", closefd=False), encoding="utf-8", errors="replace")
+                except Exception:
+                    pass
+        else:
+            # 交互式控制台模式下挂载至父进程控制台
+            if kernel32.AttachConsole(-1):
+                try:
+                    sys.stdout = open("CONOUT$", "w", encoding="utf-8", errors="replace")
+                    sys.stderr = open("CONOUT$", "w", encoding="utf-8", errors="replace")
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -348,6 +372,62 @@ def run_smoke_test() -> int:
         print(f"[OK] StandalonePluginMainWindow 与 StandalonePluginSettingsDialog 实例化成功")
     except Exception as e:
         err = f"StandaloneRunner 测试异常: {e}\n{traceback.format_exc()}"
+        report["errors"].append(err)
+        print(f"[FAIL] {err}")
+
+    # 9. 验证 B 站媒体下载器新功能模块链路 (暂停/恢复、断点检测、单项画质微调、内置 Inno Setup)
+    print("\n--- 9. 验证 B 站媒体下载器新功能链路与依赖完整性 ---")
+    try:
+        from toolbox.plugins.media_downloader.downloader import (
+            MediaDownloadWorker,
+            check_item_downloaded,
+            get_task_target_filename
+        )
+        from toolbox.plugins.media_downloader.ui import MediaDownloaderWidget
+        from toolbox.plugins.media_downloader.api import QUALITY_MAP
+
+        # 9.1 文件名与已下载智能检测
+        test_task = {"title": "测试视频", "part": "P01_测试", "bvid": "BV1_SMOKE"}
+        fn = get_task_target_filename(test_task, audio_only=False)
+        assert fn.endswith(".mp4"), f"生成文件名异常: {fn}"
+        
+        # 9.2 暂停/恢复状态机
+        worker = MediaDownloadWorker(
+            video_url="http://127.0.0.1/fake_v",
+            audio_url="http://127.0.0.1/fake_a",
+            save_dir=get_app_root(),
+            title="smoke_test_task"
+        )
+        assert not worker._is_paused
+        worker.pause()
+        assert worker._is_paused
+        worker.resume()
+        assert not worker._is_paused
+
+        # 9.3 下载器界面新特性属性校验
+        mw = MediaDownloaderWidget()
+        assert hasattr(mw, "btn_detect_downloaded"), "缺少已下载检测按钮"
+        assert hasattr(mw, "btn_retry_failed"), "缺少一键重试未下载按钮"
+        assert hasattr(mw, "btn_pause_resume"), "缺少暂停/恢复按钮"
+        assert hasattr(mw, "combo_item_quality"), "缺少单项画质选择框"
+        assert hasattr(mw, "btn_apply_quality_to_checked"), "缺少批量应用画质按钮"
+        assert hasattr(mw, "cb_skip_existing"), "缺少跳过已下载复选框"
+        assert hasattr(mw, "_retry_failed_items"), "缺少重试未下载项方法"
+        assert hasattr(mw, "_detect_downloaded_items"), "缺少检测已下载方法"
+        assert hasattr(mw, "_apply_quality_to_checked"), "缺少批量应用画质方法"
+        mw.close()
+
+        # 9.4 内置 Inno Setup 编译器定位健全性
+        iscc = PluginExporter.find_iscc_executable()
+        if iscc and os.path.isfile(iscc):
+            report["binaries"]["inno_setup_iscc"] = iscc
+            print(f"[OK] B站下载器新功能、状态机与内置 Inno Setup 验证全部通过 (ISCC: {iscc})")
+        else:
+            err = "未能在打包环境中找到内置 Inno Setup 编译器 (ISCC.exe)"
+            report["errors"].append(err)
+            print(f"[FAIL] {err}")
+    except Exception as e:
+        err = f"B站下载器新功能验证异常: {e}\n{traceback.format_exc()}"
         report["errors"].append(err)
         print(f"[FAIL] {err}")
 
