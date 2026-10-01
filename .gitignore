@@ -39,6 +39,7 @@ output/
 # Local configurations
 toolbox_config.json
 *.local.json
+*.lock
 
 # Large external binaries (>100MB, distributed via Releases)
 bin/ffmpeg.exe

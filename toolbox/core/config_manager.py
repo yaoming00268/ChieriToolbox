@@ -5,8 +5,19 @@
 
 import json
 import os
+import sys
 import threading
 from typing import Any, Dict, Optional
+
+
+def _deep_merge_dict(target: dict, source: dict) -> dict:
+    """深度递归合并字典，source 覆盖 target 中相同键的值"""
+    for k, v in source.items():
+        if k in target and isinstance(target[k], dict) and isinstance(v, dict):
+            _deep_merge_dict(target[k], v)
+        else:
+            target[k] = v
+    return target
 
 
 class ConfigManager:
@@ -85,23 +96,57 @@ class ConfigManager:
                 with open(self.config_file, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
                     if isinstance(loaded, dict):
-                        default_config.update(loaded)
+                        _deep_merge_dict(default_config, loaded)
             except Exception as e:
                 print(f"[ConfigManager] 读取配置文件失败: {e}，将使用默认配置")
         return default_config
 
     def save(self):
-        """原子持久化当前配置到文件"""
+        """原子持久化当前配置到文件，带跨进程文件锁与最新状态递归合并以防丢失更新"""
         with self._lock:
+            dir_path = os.path.dirname(os.path.abspath(self.config_file))
+            os.makedirs(dir_path, exist_ok=True)
+            lock_path = self.config_file + ".lock"
+            lock_fd = None
+            locked = False
+            if sys.platform == "win32":
+                try:
+                    import msvcrt
+                    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+                    msvcrt.locking(lock_fd, msvcrt.LK_LOCK, 1)
+                    locked = True
+                except Exception:
+                    pass
+
             try:
-                dir_path = os.path.dirname(os.path.abspath(self.config_file))
-                os.makedirs(dir_path, exist_ok=True)
+                # 重新载入磁盘上其他进程可能写入的最新配置并进行深度合并
+                if os.path.exists(self.config_file) and os.path.getsize(self.config_file) > 0:
+                    try:
+                        with open(self.config_file, "r", encoding="utf-8") as f:
+                            disk_data = json.load(f)
+                            if isinstance(disk_data, dict):
+                                self.data = _deep_merge_dict(disk_data, self.data)
+                    except Exception:
+                        pass
+
                 tmp_file = os.path.join(dir_path, f"._tmp_cfg_{os.getpid()}_{os.path.basename(self.config_file)}")
                 with open(tmp_file, "w", encoding="utf-8") as f:
                     json.dump(self.data, f, ensure_ascii=False, indent=2)
                 os.replace(tmp_file, self.config_file)
             except Exception as e:
                 print(f"[ConfigManager] 保存配置文件失败: {e}")
+            finally:
+                if lock_fd is not None:
+                    try:
+                        if locked:
+                            import msvcrt
+                            msvcrt.locking(lock_fd, msvcrt.LK_UNLCK, 1)
+                    except Exception:
+                        pass
+                    try:
+                        os.close(lock_fd)
+                    except Exception:
+                        pass
 
     def get(self, key: str, default: Any = None) -> Any:
         """获取顶级配置项"""

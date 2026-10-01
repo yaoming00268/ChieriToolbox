@@ -73,7 +73,37 @@ def get_window_rect_under_cursor() -> Optional[QRect]:
         w = rect.right - rect.left
         h = rect.bottom - rect.top
         if w > 10 and h > 10:
-            return QRect(rect.left, rect.top, w, h)
+            # 准确获取窗口所在物理显示器的坐标原点，完美支持多显示器负坐标与混合 DPI 缩放
+            class _MONITORINFO(ctypes.Structure):
+                _fields_ = [
+                    ('cbSize', wintypes.DWORD),
+                    ('rcMonitor', wintypes.RECT),
+                    ('rcWork', wintypes.RECT),
+                    ('dwFlags', wintypes.DWORD)
+                ]
+
+            mi = _MONITORINFO()
+            mi.cbSize = ctypes.sizeof(_MONITORINFO)
+            m_left, m_top = 0, 0
+            hmon = user32.MonitorFromWindow(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
+            if hmon and user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+                m_left = mi.rcMonitor.left
+                m_top = mi.rcMonitor.top
+
+            # 找到鼠标所在屏幕以换算 High-DPI 缩放系数与逻辑原点
+            cursor_pos = QCursor.pos()
+            screen = QGuiApplication.screenAt(cursor_pos) or QGuiApplication.primaryScreen()
+            dpr = screen.devicePixelRatio() if screen else 1.0
+            if dpr <= 0:
+                dpr = 1.0
+            s_geo = screen.geometry() if screen else QRect(0, 0, 1920, 1080)
+
+            # 核心算法：屏幕内物理偏移量除以 DPR，再加上 Qt 屏幕的逻辑原点
+            log_x = s_geo.x() + int(round((rect.left - m_left) / dpr))
+            log_y = s_geo.y() + int(round((rect.top - m_top) / dpr))
+            log_w = int(round(w / dpr))
+            log_h = int(round(h / dpr))
+            return QRect(log_x, log_y, log_w, log_h)
     except Exception:
         pass
     return None

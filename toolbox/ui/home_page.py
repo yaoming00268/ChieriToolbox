@@ -237,6 +237,7 @@ class HomePage(QWidget):
             item = self.recent_layout.takeAt(0)
             widget = item.widget()
             if widget:
+                widget.hide()
                 widget.setParent(None)
                 widget.deleteLater()
 
@@ -282,13 +283,13 @@ class HomePage(QWidget):
 
         for pid in valid_recents[:8]:
             p = enabled_plugins_map[pid]
-            btn = QPushButton(f" {p.name}")
+            btn = QPushButton(f" {p.name}", self.recent_frame)
             btn.setIcon(get_plugin_icon(p.id, size=14))
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(chip_style)
-            btn.adjustSize()
             btn.clicked.connect(lambda checked=False, target_id=pid: self.open_plugin_requested.emit(target_id))
             self.recent_layout.addWidget(btn)
+            btn.adjustSize()
 
         self.recent_layout.addStretch()
 
@@ -305,6 +306,7 @@ class HomePage(QWidget):
             item = self.cat_layout.takeAt(0)
             widget = item.widget()
             if widget:
+                widget.hide()
                 widget.setParent(None)
                 widget.deleteLater()
 
@@ -337,7 +339,7 @@ class HomePage(QWidget):
         pill_style = self._get_pill_style(is_dark)
 
         for cat, count in category_counts.items():
-            btn = QPushButton(f"{cat} ({count})")
+            btn = QPushButton(f"{cat} ({count})", self.cat_frame)
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -351,14 +353,14 @@ class HomePage(QWidget):
             if cat == self.current_category:
                 btn.setChecked(True)
             btn.setStyleSheet(pill_style)
+            self.cat_button_group.addButton(btn)
+            self.cat_layout.addWidget(btn)
             btn.adjustSize()
             btn.installEventFilter(self)
             btn.clicked.connect(lambda checked, c=cat, b=btn: self._on_category_clicked(c, b))
-            self.cat_button_group.addButton(btn)
-            self.cat_layout.addWidget(btn)
 
         # 胶囊栏尾部“新建分组”微按钮
-        self.btn_new_group = QPushButton()
+        self.btn_new_group = QPushButton(self.cat_frame)
         self.btn_new_group.setFixedSize(28, 28)
         self.btn_new_group.setCursor(Qt.PointingHandCursor)
         self.btn_new_group.setIcon(get_icon("plus", size=13))
@@ -563,34 +565,36 @@ class HomePage(QWidget):
             if plugin.id in self._card_pool:
                 card = self._card_pool[plugin.id]
                 card.update_card_size(card_w, card_h)
+                if card.parent() is not self.cards_container:
+                    card.setParent(self.cards_container)
             else:
-                card = PluginCardWidget(plugin, card_width=card_w, card_height=card_h)
+                card = PluginCardWidget(plugin, card_width=card_w, card_height=card_h, parent=self.cards_container)
                 card.clicked.connect(self.open_plugin_requested.emit)
                 card.card_context_menu_requested.connect(self._on_card_context_menu)
                 self._card_pool[plugin.id] = card
 
+            self.grid_layout.addWidget(card, row, col)
             card.setVisible(True)
             self.card_widgets.append(card)
-            self.grid_layout.addWidget(card, row, col)
 
         if not matched_plugins:
-            empty_widget = QWidget()
+            empty_widget = QWidget(self.cards_container)
             empty_layout = QVBoxLayout(empty_widget)
             empty_layout.setAlignment(Qt.AlignCenter)
             empty_layout.setSpacing(12)
             empty_layout.setContentsMargins(0, 40, 0, 0)
 
-            icon_lbl = QLabel()
+            icon_lbl = QLabel(empty_widget)
             icon_lbl.setAlignment(Qt.AlignCenter)
             icon_lbl.setPixmap(get_pixmap("search", color="#64748b", size=48))
             empty_layout.addWidget(icon_lbl)
 
-            lbl_hint = QLabel("未找到匹配的功能模块")
+            lbl_hint = QLabel("未找到匹配的功能模块", empty_widget)
             lbl_hint.setStyleSheet("color: #64748b; font-size: 15px; font-weight: 600;")
             lbl_hint.setAlignment(Qt.AlignCenter)
             empty_layout.addWidget(lbl_hint)
 
-            btn_reset = QPushButton("清除搜索与筛选")
+            btn_reset = QPushButton("清除搜索与筛选", empty_widget)
             btn_reset.setFixedWidth(140)
             btn_reset.clicked.connect(self._reset_filters)
             empty_layout.addWidget(btn_reset, 0, Qt.AlignCenter)
@@ -654,13 +658,7 @@ class HomePage(QWidget):
         while self.grid_layout.count():
             self.grid_layout.takeAt(0)
 
-        dummy = QWidget()
-        dummy.setLayout(self.cards_container.layout())
-        self.grid_layout = QGridLayout(self.cards_container)
         self.grid_layout.setSpacing(spacing)
-        self.grid_layout.setContentsMargins(4, 4, 4, 24)
-        self.grid_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-
         for idx, card in enumerate(widgets):
             card.update_card_size(card_w, card_h)
             row = idx // columns

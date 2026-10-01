@@ -248,11 +248,16 @@ class FolderFlattenEngine:
         errors = []
 
         for folder in target_folders:
-            folder = os.path.normpath(folder)
+            folder = os.path.normpath(os.path.abspath(folder))
             if not os.path.isdir(folder):
                 continue
 
             parent_dir = os.path.dirname(folder)
+            drive, rest = os.path.splitdrive(folder)
+            if not rest.strip("\\/") or folder == parent_dir:
+                errors.append(f"禁止对驱动器根目录执行扁平化操作: {folder}")
+                continue
+
             if not parent_dir or not os.path.exists(parent_dir):
                 errors.append(f"无法确定上级目录: {folder}")
                 continue

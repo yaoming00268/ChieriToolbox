@@ -405,33 +405,35 @@ class BiliApiClient:
         input_str = input_str.strip()
 
         # 短链展开处理
+        expanded_str = input_str
         if "b23.tv" in input_str:
             try:
                 res = requests.head(input_str, allow_redirects=True, timeout=5)
-                input_str = res.url
+                if res.url:
+                    expanded_str = res.url
             except Exception:
                 pass
 
         # 优先检测 BV 号 (如同时存在其他参数以 BV 为准)
-        bvid = cls.extract_bvid(input_str)
+        bvid = cls.extract_bvid(expanded_str)
         if bvid:
             return "video", bvid
 
         # 检测收藏夹
-        if any(kw in input_str.lower() for kw in ("favlist", "medialist", "ml", "fid")):
-            fid = cls.extract_fav_id(input_str)
+        if any(kw in expanded_str.lower() for kw in ("favlist", "medialist", "ml", "fid")):
+            fid = cls.extract_fav_id(expanded_str)
             if fid:
                 return "favorite", fid
 
         # 检测 UP 主空间
-        if "space.bilibili.com" in input_str or any(kw in input_str.lower() for kw in ("uid", "mid")):
-            mid = cls.extract_up_mid(input_str)
+        if "space.bilibili.com" in expanded_str or any(kw in expanded_str.lower() for kw in ("uid", "mid")):
+            mid = cls.extract_up_mid(expanded_str)
             if mid:
                 return "space", mid
 
         # 纯数字输入：未显式指明
-        if input_str.isdigit():
-            return "unknown", input_str
+        if expanded_str.isdigit():
+            return "unknown", expanded_str
 
         return "unknown", None
 

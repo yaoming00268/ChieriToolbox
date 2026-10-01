@@ -237,6 +237,53 @@ class TestLazyPluginLoading(unittest.TestCase):
 
         win.close()
 
+    def test_09_homepage_cards_never_trigger_top_level_windows_during_render(self):
+        """验证首页卡片、最近使用栏与分类导航按钮在渲染与刷新时，绝不因缺少 parent 而弹出为独立顶层窗口"""
+        from toolbox.ui.home_page import HomePage
+        from toolbox.core.plugin_manager import PluginManager
+        from toolbox.ui.components.card_widget import PluginCardWidget
+
+        # 监控所有 QWidget 的 setVisible(True) 操作，一旦发现卡片在没有 parent 的情况下被设置为可见立即记录
+        rogue_top_level_widgets = []
+        orig_set_visible = QWidget.setVisible
+
+        def intercepted_set_visible(widget, visible):
+            if visible and widget.parent() is None and isinstance(widget, (PluginCardWidget, QFrame)):
+                rogue_top_level_widgets.append((widget.__class__.__name__, widget.objectName()))
+            return orig_set_visible(widget, visible)
+
+        QWidget.setVisible = intercepted_set_visible
+        try:
+            pm = PluginManager()
+            plugins = pm.get_all_plugins()
+            if not plugins:
+                pm.discover_and_load()
+                plugins = pm.get_all_plugins()
+
+            home = HomePage()
+            home.set_plugins(plugins)
+            QApplication.processEvents()
+
+            # 再次强制切换分类并搜索，模拟用户频繁交互刷新
+            home.current_category = "全部"
+            home._filter_and_render_cards()
+            QApplication.processEvents()
+
+            home.current_category = "最近使用"
+            home._filter_and_render_cards()
+            QApplication.processEvents()
+
+            home.close()
+        finally:
+            QWidget.setVisible = orig_set_visible
+
+        self.assertEqual(
+            rogue_top_level_widgets,
+            [],
+            f"严禁在未挂载父容器时将卡片设置为可见引发桌面幽灵弹窗: {rogue_top_level_widgets}"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -80,10 +80,14 @@ def apply_dual_opacity(widget: QWidget, bg_opacity: float = 1.0, component_opaci
         bg_val = max(0.2, min(1.0, float(bg_opacity)))
         comp_val = max(0.4, min(1.0, float(component_opacity)))
 
-        # 1. 窗口底板/背景透光度
-        widget.setWindowOpacity(bg_val)
+        # 1. 顶层窗口保持 1.0 不透明度，杜绝全局 Alpha 通道压低子控件引发双重相乘发虚发暗
+        widget.setWindowOpacity(1.0)
+        if bg_val < 0.999:
+            widget.setAttribute(Qt.WA_TranslucentBackground, True)
+        else:
+            widget.setAttribute(Qt.WA_TranslucentBackground, False)
 
-        # 2. 交互组件透明度 (通过 centralWidget 上的 QGraphicsOpacityEffect 实现)
+        # 2. 交互组件透明度 (通过 centralWidget 上的 QGraphicsOpacityEffect 独立控制)
         central = getattr(widget, "centralWidget", None)
         target = central() if callable(central) and central() else widget
 
@@ -99,6 +103,7 @@ def apply_dual_opacity(widget: QWidget, bg_opacity: float = 1.0, component_opaci
                 target._component_opacity_effect = effect
                 target.setGraphicsEffect(effect)
             effect.setOpacity(comp_val)
+        widget.update()
     except Exception as e:
         print(f"[WindowEffects] 设置双层透明度失败: {e}")
 

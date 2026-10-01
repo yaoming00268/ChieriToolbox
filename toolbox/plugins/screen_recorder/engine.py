@@ -314,28 +314,41 @@ class ScreenRecorderEngine(QObject):
         # OBS 级音频选择机制 (系统声音与麦克风双轨混音)
         audio_sources = []
 
-        def _resolve_audio_device(dev_name: str, is_mic: bool) -> Optional[str]:
+        def _resolve_audio_source(dev_name: str, is_mic: bool) -> Optional[Tuple[str, str]]:
             dev_str = dev_name.strip() if dev_name else ""
             if not dev_str or any(kw in dev_str for kw in ("不录制", "无设备", "未检测到")):
                 return None
-            if "默认" not in dev_str:
-                return f"audio={dev_str}"
-            # 针对默认选项解析系统内真实的 DirectShow 设备
+
             if is_mic:
                 mics = get_audio_input_devices()
-                if mics:
-                    return f"audio={mics[0]}"
+                dev = dev_str if "默认" not in dev_str else (mics[0] if mics else "")
+                if dev and dev not in ("默认音频输入设备", "无设备"):
+                    return ("dshow", f"audio={dev}")
+                return None
             else:
-                outs = get_audio_output_devices()
-                for o in outs:
-                    if any(k in o.lower() for k in ("stereo", "mix", "cable", "混音", "loopback")):
-                        return f"audio={o}"
-                if outs:
-                    return f"audio={outs[0]}"
-            return None
+                # 系统内录：优先使用 Windows 官方推荐的 WASAPI Loopback 驱动
+                try:
+                    creationflags_chk = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                    chk = subprocess.run([ffmpeg_bin, "-devices"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=creationflags_chk, timeout=3)
+                    has_wasapi = "wasapi" in chk.stdout.lower() or "wasapi" in chk.stderr.lower()
+                except Exception:
+                    has_wasapi = False
 
-        s_src = _resolve_audio_device(system_audio_device, is_mic=False) if system_audio_device else None
-        m_src = _resolve_audio_device(mic_device, is_mic=True) if mic_device else None
+                if has_wasapi:
+                    return ("wasapi", "default")
+
+                # 若当前 FFmpeg 未内置 wasapi，检查 DirectShow 中是否存在立体声混音或虚拟音频驱动 (VB-Cable 等)
+                outs = get_audio_output_devices()
+                loopback_cands = [o for o in outs if any(k in o.lower() for k in ("stereo", "mix", "cable", "混音", "loopback"))]
+                if loopback_cands:
+                    return ("dshow", f"audio={loopback_cands[0]}")
+                if any(k in dev_str.lower() for k in ("stereo", "mix", "cable", "混音", "loopback")):
+                    return ("dshow", f"audio={dev_str}")
+                # 避免将不可作为 DirectShow 录入源的实体扬声器传入导致 FFmpeg 立即报错中断
+                return None
+
+        s_src = _resolve_audio_source(system_audio_device, is_mic=False) if system_audio_device else None
+        m_src = _resolve_audio_source(mic_device, is_mic=True) if mic_device else None
 
         if s_src:
             audio_sources.append(s_src)
@@ -344,13 +357,13 @@ class ScreenRecorderEngine(QObject):
 
         # 兼容旧参数调用
         if not audio_sources and record_audio and audio_device:
-            legacy_src = _resolve_audio_device(audio_device, is_mic=True)
+            legacy_src = _resolve_audio_source(audio_device, is_mic=True)
             if legacy_src:
                 audio_sources.append(legacy_src)
 
         has_audio = len(audio_sources) > 0
-        for src in audio_sources:
-            cmd.extend(["-f", "dshow", "-i", src])
+        for fmt_type, src in audio_sources:
+            cmd.extend(["-f", fmt_type, "-i", src])
 
         fmt = format_choice.upper()
         if fmt == "GIF":
@@ -363,20 +376,24 @@ class ScreenRecorderEngine(QObject):
                 "-crf", str(crf)
             ])
             if len(audio_sources) == 2:
-                # 混音系统声音 (1:a) 与麦克风 (2:a)
+                # 混音系统声音 (1:a) 与麦克风 (2:a)，增加重采样防止采样率不一致崩溃
                 cmd.extend([
                     "-filter_complex", "[1:a][2:a]amix=inputs=2:duration=first:dropout_transition=2[aout]",
                     "-map", "0:v",
                     "-map", "[aout]",
                     "-c:a", "aac",
-                    "-b:a", "160k"
+                    "-b:a", "160k",
+                    "-ar", "48000",
+                    "-ac", "2"
                 ])
             elif len(audio_sources) == 1:
                 cmd.extend([
                     "-map", "0:v",
                     "-map", "1:a",
                     "-c:a", "aac",
-                    "-b:a", "128k"
+                    "-b:a", "128k",
+                    "-ar", "48000",
+                    "-ac", "2"
                 ])
 
         cmd.append(output_path)

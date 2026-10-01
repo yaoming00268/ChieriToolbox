@@ -116,8 +116,42 @@ def get_locking_processes(file_or_dir_path: str) -> List[Tuple[int, str]]:
         rm.RmEndSession(session_handle)
 
 
+CRITICAL_SYSTEM_PROCESSES = {
+    "csrss.exe", "lsass.exe", "services.exe", "wininit.exe",
+    "smss.exe", "explorer.exe", "svchost.exe", "winlogon.exe",
+    "system", "registry", "fontdrvhost.exe", "dwm.exe"
+}
+
+
+def is_process_critical(pid: int) -> bool:
+    """检查进程是否为 Windows 系统关键临界进程 (强杀将引发 BSOD 蓝屏)"""
+    if pid in (0, 4, os.getpid()):
+        return True
+    if sys.platform != "win32":
+        return False
+    try:
+        kernel32 = ctypes.windll.kernel32
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
+        try:
+            is_critical = ctypes.c_int(0)
+            if hasattr(kernel32, "IsProcessCritical"):
+                if kernel32.IsProcessCritical(handle, ctypes.byref(is_critical)):
+                    return bool(is_critical.value)
+        finally:
+            kernel32.CloseHandle(handle)
+    except Exception:
+        pass
+    return False
+
+
 def kill_process(pid: int, force_tree: bool = True) -> Tuple[bool, str]:
-    """强杀指定 PID 的进程及子进程树"""
+    """强杀指定 PID 的进程及子进程树 (严格防护核心系统关键进程)"""
+    if pid in (0, 4, os.getpid()) or is_process_critical(pid):
+        return False, f"系统保护: PID {pid} 为系统关键核心进程或当前自身进程，禁止终止！"
+
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     cmd = ["taskkill", "/F"]
     if force_tree:
@@ -145,6 +179,9 @@ def kill_process(pid: int, force_tree: bool = True) -> Tuple[bool, str]:
 
 def kill_processes_by_name(image_name: str) -> Tuple[bool, str]:
     """强杀指定映像名的所有进程"""
+    if image_name.lower() in CRITICAL_SYSTEM_PROCESSES:
+        return False, f"系统保护: [{image_name}] 属于 Windows 核心系统进程，禁止终止！"
+
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     cmd = ["taskkill", "/F", "/T", "/IM", image_name]
     try:
@@ -204,13 +241,39 @@ def force_unlock_and_delete(
     if not os.path.exists(target):
         return True, "目标路径已不存在。"
 
+    # 路径安全防护：拦截根驱动器与系统核心目录（防止误粉碎全盘或破坏操作系统）
+    target_norm = os.path.normcase(target)
+    drive, rest = os.path.splitdrive(target)
+    sys_root = os.path.normcase(os.environ.get("SystemRoot", "C:\\Windows"))
+    prog_files = os.path.normcase(os.environ.get("ProgramFiles", "C:\\Program Files"))
+    prog_files_x86 = os.path.normcase(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"))
+    prog_data = os.path.normcase(os.environ.get("ProgramData", "C:\\ProgramData"))
+    user_root = os.path.normcase(os.path.dirname(os.environ.get("USERPROFILE", "C:\\Users\\Default")))
+
+    protected_exact_dirs = {
+        sys_root,
+        prog_files,
+        prog_files_x86,
+        prog_data,
+        user_root,
+        (os.environ.get("SystemDrive", "C:") + "\\").lower(),
+    }
+    if (
+        not rest.strip("\\/")
+        or target == os.path.dirname(target)
+        or target_norm in protected_exact_dirs
+        or target_norm == sys_root
+        or target_norm.startswith(sys_root + os.sep)
+    ):
+        return False, "受系统保护的核心系统路径或根驱动器，禁止强制粉碎！"
+
     # 1. 检测并结束占用进程
     locking = get_locking_processes(target)
     killed_info = []
     if locking and auto_kill_locking_procs:
         for pid, name in locking:
-            # 保护自身与核心系统关键进程
-            if pid in (0, 4, os.getpid()):
+            # 保护自身与核心系统关键进程 (防止 Windows 蓝屏死机 BSOD)
+            if pid in (0, 4, os.getpid()) or name.lower() in CRITICAL_SYSTEM_PROCESSES or is_process_critical(pid):
                 continue
             ok, msg = kill_process(pid, force_tree=True)
             if ok:
@@ -308,86 +371,5 @@ def list_running_processes(filter_kw: str = "") -> List[Dict]:
         return []
 
 
-def scan_registry_installed_apps() -> List[Dict[str, str]]:
-    """
-    扫描 Windows 注册表已安装软件 (HKLM & HKCU, 包含 32/64 位)。
-    提取应用名称、版本、安装目录、主执行程序与卸载命令，便于强制解除占用与顽固卸载粉碎。
-    """
-    apps = []
-    seen = set()
-
-    roots = [
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ | getattr(winreg, "KEY_WOW64_64KEY", 0)),
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ | getattr(winreg, "KEY_WOW64_32KEY", 0)),
-        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ),
-    ]
-
-    for hkey, subkey_path, access_mask in roots:
-        try:
-            with winreg.OpenKey(hkey, subkey_path, 0, access_mask) as root_key:
-                num_subkeys, _, _ = winreg.QueryInfoKey(root_key)
-                for i in range(num_subkeys):
-                    try:
-                        sub_name = winreg.EnumKey(root_key, i)
-                        with winreg.OpenKey(root_key, sub_name, 0, access_mask) as app_key:
-                            def _get_val(k):
-                                try:
-                                    v, _ = winreg.QueryValueEx(app_key, k)
-                                    return str(v).strip()
-                                except Exception:
-                                    return ""
-
-                            disp_name = _get_val("DisplayName")
-                            if not disp_name or _get_val("SystemComponent") == "1":
-                                continue
-
-                            disp_ver = _get_val("DisplayVersion")
-                            pub = _get_val("Publisher")
-                            inst_loc = _get_val("InstallLocation")
-                            disp_icon = _get_val("DisplayIcon")
-                            uninst_str = _get_val("UninstallString")
-
-                            exe_path = ""
-                            if disp_icon:
-                                raw_icon = disp_icon.split(",")[0].strip('"')
-                                if raw_icon.lower().endswith(".exe") and os.path.isfile(raw_icon):
-                                    exe_path = raw_icon
-
-                            if not exe_path and inst_loc and os.path.isdir(inst_loc):
-                                try:
-                                    for f in os.listdir(inst_loc):
-                                        if f.lower().endswith(".exe"):
-                                            candidate = os.path.join(inst_loc, f)
-                                            if os.path.isfile(candidate):
-                                                exe_path = candidate
-                                                break
-                                except Exception:
-                                    pass
-
-                            if not inst_loc and exe_path:
-                                inst_loc = os.path.dirname(exe_path)
-                            elif not inst_loc and uninst_str:
-                                m = re.search(r'["\']?([^"\']+\.exe)["\']?', uninst_str, re.IGNORECASE)
-                                if m and os.path.isfile(m.group(1)):
-                                    inst_loc = os.path.dirname(m.group(1))
-
-                            key_id = f"{disp_name}_{disp_ver}".lower()
-                            if key_id not in seen:
-                                seen.add(key_id)
-                                apps.append({
-                                    "name": disp_name,
-                                    "version": disp_ver,
-                                    "publisher": pub,
-                                    "install_location": inst_loc,
-                                    "exe_path": exe_path,
-                                    "uninstall_string": uninst_str,
-                                    "registry_key": sub_name
-                                })
-                    except Exception:
-                        continue
-        except Exception:
-            continue
-
-    apps.sort(key=lambda x: x["name"].lower())
-    return apps
+from toolbox.core.paths import scan_registry_installed_apps
 

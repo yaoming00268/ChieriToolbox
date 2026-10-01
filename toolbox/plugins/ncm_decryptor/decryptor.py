@@ -257,6 +257,12 @@ def decrypt_ncm(
                 save_dir = os.path.dirname(os.path.abspath(ncm_path))
 
             output_path = os.path.join(save_dir, out_filename)
+            # 目标冲突检测与自增后缀重命名，防止静默覆写已有文件
+            if os.path.exists(output_path):
+                counter = 1
+                while os.path.exists(os.path.join(save_dir, f"{out_base_name}_{counter}.{audio_format}")):
+                    counter += 1
+                output_path = os.path.join(save_dir, f"{out_base_name}_{counter}.{audio_format}")
 
             # 7. 解密音频数据流并写入磁盘
             with open(output_path, "wb") as out_f:

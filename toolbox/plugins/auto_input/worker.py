@@ -51,7 +51,7 @@ class TypingWorker(QThread):
             self.finished_typing.emit("警告: 待键入文本内容为空")
             return
 
-        target_hwnd = ctypes.windll.user32.GetForegroundWindow()
+        target_hwnd = ctypes.windll.user32.GetForegroundWindow() if sys.platform == "win32" else 0
 
         try:
             for char in target_text:
@@ -62,13 +62,18 @@ class TypingWorker(QThread):
                 if not char.isprintable() and char not in ('\n', '\r', '\t'):
                     continue
 
-                curr_hwnd = ctypes.windll.user32.GetForegroundWindow()
-                if curr_hwnd != target_hwnd:
-                    ctypes.windll.user32.SetForegroundWindow(target_hwnd)
-                    time.sleep(0.03)
+                if sys.platform == "win32":
+                    curr_hwnd = ctypes.windll.user32.GetForegroundWindow()
+                    if curr_hwnd != target_hwnd:
+                        self.finished_typing.emit("检测到前台窗口焦点切换，模拟键入已安全自动停止")
+                        return
 
                 keyboard.write(char)
-                time.sleep(self.delay)
+                sleep_end = time.time() + self.delay
+                while time.time() < sleep_end:
+                    if self._stop_flag:
+                        break
+                    time.sleep(min(0.01, max(0.001, sleep_end - time.time())))
 
             if not self._stop_flag:
                 self.finished_typing.emit(f"输入完成 (共 {len(target_text)} 字符)，继续监听中...")
@@ -134,11 +139,8 @@ class PasteSimulatorWorker(QObject):
         if self._typing_worker:
             if self._typing_worker.isRunning():
                 self._typing_worker.stop()
-                if not self._typing_worker.wait(1000):
-                    self._typing_worker.terminate()
-                    self._typing_worker.wait(1000)
-            if not self._typing_worker.isRunning():
-                self._typing_worker = None
+                self._typing_worker.wait(1500)
+            self._typing_worker = None
 
         if self._hotkey_hook and HAS_KEYBOARD:
             try:

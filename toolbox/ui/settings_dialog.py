@@ -724,9 +724,11 @@ class SettingsDialog(QDialog):
         for cb in self._plugin_checkboxes.values():
             parent_frame = cb.parentWidget()
             if parent_frame:
+                parent_frame.hide()
                 parent_frame.setParent(None)
                 parent_frame.deleteLater()
             else:
+                cb.hide()
                 cb.setParent(None)
                 cb.deleteLater()
         self._plugin_checkboxes.clear()
@@ -736,15 +738,18 @@ class SettingsDialog(QDialog):
         for cb in self._tray_checkboxes.values():
             parent_frame = cb.parentWidget()
             if parent_frame:
+                parent_frame.hide()
                 parent_frame.setParent(None)
                 parent_frame.deleteLater()
             else:
+                cb.hide()
                 cb.setParent(None)
                 cb.deleteLater()
         self._tray_checkboxes.clear()
         self._tray_status_labels.clear()
 
         for cb in self._autostart_checkboxes.values():
+            cb.hide()
             cb.setParent(None)
             cb.deleteLater()
         self._autostart_checkboxes.clear()
@@ -758,23 +763,23 @@ class SettingsDialog(QDialog):
             is_enabled = p.id not in disabled_plugins
 
             # 1.1 插件启用开关项 (集成显示在系统托盘勾选项)
-            item_frame = QFrame()
+            item_frame = QFrame(self.plugin_list_container)
             item_frame.setObjectName("pluginRow")
             row_layout = QHBoxLayout(item_frame)
             row_layout.setContentsMargins(4, 2, 4, 2)
             row_layout.setSpacing(10)
 
-            icon_lbl = QLabel()
+            icon_lbl = QLabel(item_frame)
             icon_lbl.setPixmap(get_plugin_badge_pixmap(p.id, size=20))
             row_layout.addWidget(icon_lbl)
 
-            cb = QCheckBox(f"{p.name} [{p.category}]")
+            cb = QCheckBox(f"{p.name} [{p.category}]", item_frame)
             cb.setChecked(is_enabled)
             cb.setToolTip(p.description)
             cb.toggled.connect(lambda checked, pid=p.id: self._on_plugin_enabled_toggled(pid, checked))
             row_layout.addWidget(cb, 1)
 
-            cb_tray_fast = QCheckBox("显示在系统托盘")
+            cb_tray_fast = QCheckBox("显示在系统托盘", item_frame)
             cb_tray_fast.setChecked(is_enabled and (p.id in tray_plugins))
             cb_tray_fast.setEnabled(is_enabled)
             cb_tray_fast.setToolTip("显示在系统托盘" if is_enabled else "需先启用此插件才能常驻系统托盘")
@@ -783,7 +788,7 @@ class SettingsDialog(QDialog):
             row_layout.addWidget(cb_tray_fast)
             self._plugin_tray_checkboxes[p.id] = cb_tray_fast
 
-            lbl_desc = QLabel(p.description)
+            lbl_desc = QLabel(p.description, item_frame)
             lbl_desc.setStyleSheet("color: #64748b; font-size: 11px;")
             lbl_desc.setMaximumWidth(260)
             row_layout.addWidget(lbl_desc)
@@ -792,17 +797,17 @@ class SettingsDialog(QDialog):
             self._plugin_checkboxes[p.id] = cb
 
             # 1.2 独立系统托盘常驻管理行
-            t_frame = QFrame()
+            t_frame = QFrame(self.tray_list_container)
             t_frame.setObjectName("trayRow")
             t_layout = QHBoxLayout(t_frame)
             t_layout.setContentsMargins(6, 4, 6, 4)
             t_layout.setSpacing(10)
 
-            t_icon_lbl = QLabel()
+            t_icon_lbl = QLabel(t_frame)
             t_icon_lbl.setPixmap(get_plugin_badge_pixmap(p.id, size=22))
             t_layout.addWidget(t_icon_lbl)
 
-            t_cb = QCheckBox(f"{p.name} [{p.category}]")
+            t_cb = QCheckBox(f"{p.name} [{p.category}]", t_frame)
             t_cb.setStyleSheet("font-weight: 600;")
             t_cb.setChecked(is_enabled and (p.id in tray_plugins))
             t_cb.setEnabled(is_enabled)
@@ -810,13 +815,13 @@ class SettingsDialog(QDialog):
             t_cb.toggled.connect(lambda checked, pid=p.id: self._on_tray_plugin_toggled(pid, checked))
             t_layout.addWidget(t_cb, 1)
 
-            t_desc = QLabel(p.description)
+            t_desc = QLabel(p.description, t_frame)
             t_desc.setStyleSheet("color: #64748b; font-size: 11px;")
             t_desc.setMaximumWidth(280)
             t_layout.addWidget(t_desc)
 
             in_tray_active = is_enabled and (p.id in tray_plugins)
-            t_status = QLabel("常驻中" if in_tray_active else "未常驻")
+            t_status = QLabel("常驻中" if in_tray_active else "未常驻", t_frame)
             if in_tray_active:
                 t_status.setStyleSheet("color: #10b981; font-size: 11px; font-weight: bold; background: #064e3b; padding: 2px 6px; border-radius: 4px;")
             else:
@@ -828,7 +833,7 @@ class SettingsDialog(QDialog):
             self._tray_status_labels[p.id] = t_status
 
             # 1.3 自启动多选功能项
-            as_cb = QCheckBox(f"{p.name} ({p.id})")
+            as_cb = QCheckBox(f"{p.name} ({p.id})", self.autostart_container)
             as_cb.setChecked(p.id in autostart_plugins)
             self.autostart_layout.addWidget(as_cb)
             self._autostart_checkboxes[p.id] = as_cb

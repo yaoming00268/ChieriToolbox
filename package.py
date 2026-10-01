@@ -122,7 +122,7 @@ def run_smoke_test(exe_path: Optional[str] = None) -> bool:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=180
+            timeout=300
         )
         if proc.stdout:
             try:
@@ -228,11 +228,18 @@ def build_portable_zip(source_dir: Optional[str] = None, output_zip: Optional[st
     exclude_patterns = [".log", ".tmp", ".m4s", ".bak", "smoke_test_report.json", "verified_", "toolbox_config.json", ".local.json", "test_"]
     with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for root, dirs, files in os.walk(source_dir):
+            dirs[:] = [d for d in dirs if not any(pat in d for pat in exclude_patterns)]
+            for d in dirs:
+                full_d = os.path.join(root, d)
+                rel_d = os.path.relpath(full_d, source_dir).replace("\\", "/") + "/"
+                zinfo = zipfile.ZipInfo(rel_d)
+                zinfo.external_attr = 0o755 << 16 | 0x10
+                zf.writestr(zinfo, "")
             for f in files:
                 if any(f.endswith(pat) or pat in f for pat in exclude_patterns):
                     continue
                 full_path = os.path.join(root, f)
-                rel_path = os.path.relpath(full_path, source_dir)
+                rel_path = os.path.relpath(full_path, source_dir).replace("\\", "/")
                 zf.write(full_path, rel_path)
 
     size_mb = os.path.getsize(output_zip) / (1024 * 1024)

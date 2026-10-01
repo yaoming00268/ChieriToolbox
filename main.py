@@ -70,7 +70,10 @@ if CURRENT_DIR not in sys.path:
 
 try:
     from toolbox.app import ToolboxApp
-except Exception:
+except Exception as e:
+    import traceback
+    print(f"[main.py] ToolboxApp import failed: {e}", file=sys.stderr)
+    traceback.print_exc()
     ToolboxApp = None
 
 
@@ -497,6 +500,16 @@ def main():
             extra_paths = [arg for arg in initial_args if not arg.startswith("--") and arg != target_plugin_id]
             from toolbox.standalone_runner import launch_standalone
             sys.exit(launch_standalone(target_plugin_id, autostart=autostart, initial_paths=extra_paths))
+
+    # 单实例唤醒与参数转发机制 (避免资源管理器右键多选引发多进程风暴)
+    if not (initial_args and any(arg in initial_args for arg in ("--no-single-instance", "--plugin", "--smoke-test", "--check", "--diagnose", "--visual-test", "--screenshot"))):
+        try:
+            from toolbox.app import check_and_forward_single_instance
+            if check_and_forward_single_instance(initial_args):
+                print("[SingleInstance] 已将参数转发至正在运行的工具箱主窗口实例，退出当前冗余进程。")
+                sys.exit(0)
+        except Exception:
+            pass
 
     try:
         if ToolboxApp is None:

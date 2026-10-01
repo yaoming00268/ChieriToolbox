@@ -145,27 +145,39 @@ def list_archive_contents(archive_path: str, password: Optional[str] = None) -> 
 
 
 def _is_safe_path(base_dir: str, path: str) -> bool:
-    target = os.path.abspath(os.path.join(base_dir, path))
-    return target.startswith(os.path.abspath(base_dir) + os.sep)
+    try:
+        base = os.path.normcase(os.path.abspath(base_dir))
+        target = os.path.normcase(os.path.abspath(os.path.join(base_dir, path)))
+        return os.path.commonpath([base, target]) == base
+    except (ValueError, Exception):
+        return False
 
 
 def _safe_extract_zip(zf: zipfile.ZipFile, target_dir: str, pwd: Optional[bytes] = None):
-    base_resolved = os.path.abspath(target_dir)
+    base_resolved = os.path.normcase(os.path.abspath(target_dir))
     for member in zf.infolist():
-        target = os.path.abspath(os.path.join(base_resolved, member.filename))
-        if not target.startswith(base_resolved + os.sep) and target != base_resolved:
-            print(f"[ArchiveManager] 警告: 拦截到 ZipSlip 路径越界成员: {member.filename}")
+        target = os.path.normcase(os.path.abspath(os.path.join(base_resolved, member.filename)))
+        try:
+            if os.path.commonpath([base_resolved, target]) != base_resolved:
+                print(f"[ArchiveManager] 警告: 拦截到 ZipSlip 路径越界成员: {member.filename}")
+                continue
+        except (ValueError, Exception):
+            print(f"[ArchiveManager] 警告: 拦截到跨驱动器 ZipSlip 成员: {member.filename}")
             continue
         zf.extract(member, target_dir, pwd=pwd)
 
 
 def _safe_extract_tar(tf: tarfile.TarFile, target_dir: str):
-    base_resolved = os.path.abspath(target_dir)
+    base_resolved = os.path.normcase(os.path.abspath(target_dir))
     safe_members = []
     for member in tf.getmembers():
-        target = os.path.abspath(os.path.join(base_resolved, member.name))
-        if not target.startswith(base_resolved + os.sep) and target != base_resolved:
-            print(f"[ArchiveManager] 警告: 拦截到 TarSlip 路径越界成员: {member.name}")
+        target = os.path.normcase(os.path.abspath(os.path.join(base_resolved, member.name)))
+        try:
+            if os.path.commonpath([base_resolved, target]) != base_resolved:
+                print(f"[ArchiveManager] 警告: 拦截到 TarSlip 路径越界成员: {member.name}")
+                continue
+        except (ValueError, Exception):
+            print(f"[ArchiveManager] 警告: 拦截到跨驱动器 TarSlip 成员: {member.name}")
             continue
         safe_members.append(member)
     tf.extractall(target_dir, members=safe_members)
@@ -425,15 +437,30 @@ def create_archive(
             ) as zf:
                 for src in source_paths:
                     if os.path.isfile(src):
-                        zf.write(src, arcname=os.path.basename(src))
+                        zf.write(src, arcname=os.path.basename(src).replace("\\", "/"))
                     elif os.path.isdir(src):
                         base_root = os.path.basename(src.rstrip("/\\"))
-                        for root, _, files in os.walk(src):
+                        has_entries = False
+                        for root, dirs, files in os.walk(src):
+                            for d in dirs:
+                                full_d = os.path.join(root, d)
+                                rel_d = os.path.relpath(full_d, src).replace("\\", "/")
+                                arcname_d = f"{base_root}/{rel_d}/" if base_root else f"{rel_d}/"
+                                zinfo = zipfile.ZipInfo(arcname_d)
+                                zinfo.external_attr = 0o755 << 16 | 0x10
+                                zf.writestr(zinfo, "")
+                                has_entries = True
                             for f in files:
                                 full_p = os.path.join(root, f)
-                                rel_p = os.path.relpath(full_p, src)
-                                arcname = os.path.join(base_root, rel_p)
+                                rel_p = os.path.relpath(full_p, src).replace("\\", "/")
+                                arcname = f"{base_root}/{rel_p}" if base_root else rel_p
                                 zf.write(full_p, arcname=arcname)
+                                has_entries = True
+                        if not has_entries:
+                            arcname_root = f"{base_root}/" if base_root else "/"
+                            zinfo = zipfile.ZipInfo(arcname_root)
+                            zinfo.external_attr = 0o755 << 16 | 0x10
+                            zf.writestr(zinfo, "")
             return True, f"ZIP 压缩包创建完成: {output_archive}"
         except Exception as e:
             return False, f"ZIP 压缩失败: {str(e)}"

@@ -29,6 +29,7 @@ class PluginCardWidget(QFrame):
         parent=None
     ):
         super().__init__(parent)
+        self.setWindowFlags(Qt.Widget)
         self.plugin = plugin
         self.plugin_id = plugin.id
         self.setCursor(QCursor(Qt.PointingHandCursor))
@@ -42,6 +43,12 @@ class PluginCardWidget(QFrame):
 
         self.init_ui()
         self.event_bus.theme_changed.connect(self._on_theme_changed)
+
+    def setVisible(self, visible: bool):
+        # 绝不允许作为无父级的独立顶级窗口显示
+        if visible and self.parentWidget() is None:
+            return
+        super().setVisible(visible)
 
     def update_card_size(self, width: int, height: int):
         """动态更新卡片物理尺寸"""

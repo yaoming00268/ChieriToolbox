@@ -102,28 +102,70 @@ class BrowserCookieWorker(QThread):
 class MediaParseWorker(QThread):
     finished_signal = Signal(dict)
 
-    def __init__(self, api: BiliApiClient, target_type: str, target_id: str):
+    def __init__(
+        self,
+        api: BiliApiClient,
+        target_type: str = "",
+        target_id: str = "",
+        raw_text: str = "",
+        mode_idx: int = 0
+    ):
         super().__init__()
         self.api = api
         self.target_type = target_type  # "video", "favorite", "space"
         self.target_id = target_id
+        self.raw_text = raw_text
+        self.mode_idx = mode_idx
 
     def run(self):
         try:
-            if self.target_type == "favorite":
-                res = self.api.get_favorite_videos(self.target_id)
+            target_type = self.target_type
+            target_id = self.target_id
+
+            if not target_id and self.raw_text:
+                raw_text = self.raw_text.strip()
+                if self.mode_idx == 1:
+                    target_type = "video"
+                    target_id = self.api.extract_bvid(raw_text)
+                elif self.mode_idx == 2:
+                    target_type = "favorite"
+                    target_id = self.api.extract_fav_id(raw_text)
+                elif self.mode_idx == 3:
+                    target_type = "space"
+                    target_id = self.api.extract_up_mid(raw_text)
+                else:
+                    target_type, target_id = self.api.detect_target_type_and_id(raw_text)
+                    if target_type == "unknown":
+                        if raw_text.isdigit():
+                            target_type = "favorite"
+                            target_id = raw_text
+                        else:
+                            bvid = self.api.extract_bvid(raw_text)
+                            if bvid:
+                                target_type = "video"
+                                target_id = bvid
+
+            if not target_id:
+                self.finished_signal.emit({
+                    "success": False,
+                    "error": "未能从输入中提取出合法的 ID 或链接，请核对输入格式。"
+                })
+                return
+
+            if target_type == "favorite":
+                res = self.api.get_favorite_videos(target_id)
                 self.finished_signal.emit(res)
-            elif self.target_type == "space":
-                res = self.api.get_space_videos(self.target_id)
+            elif target_type == "space":
+                res = self.api.get_space_videos(target_id)
                 self.finished_signal.emit(res)
             else:
-                info = self.api.get_video_info(self.target_id)
+                info = self.api.get_video_info(target_id)
                 if info.get("success") and info.get("pages"):
                     pages = info.get("pages")
                     first_page = pages[0] if isinstance(pages, list) and pages and isinstance(pages[0], dict) else {}
                     first_cid = first_page.get("cid")
                     if first_cid:
-                        stream_res = self.api.get_play_streams(self.target_id, first_cid)
+                        stream_res = self.api.get_play_streams(target_id, first_cid)
                         if stream_res.get("success"):
                             info["available_qualities"] = stream_res.get("available_qualities", [])
                             info["stream_res"] = stream_res
@@ -1024,40 +1066,10 @@ class MediaDownloaderWidget(QWidget):
             return
 
         mode_idx = self.combo_parse_mode.currentIndex()
-        target_type = "unknown"
-        target_id = None
-
-        if mode_idx == 1:
-            target_type = "video"
-            target_id = self.api.extract_bvid(raw_text)
-        elif mode_idx == 2:
-            target_type = "favorite"
-            target_id = self.api.extract_fav_id(raw_text)
-        elif mode_idx == 3:
-            target_type = "space"
-            target_id = self.api.extract_up_mid(raw_text)
-        else:
-            target_type, target_id = self.api.detect_target_type_and_id(raw_text)
-            if target_type == "unknown":
-                if raw_text.isdigit():
-                    target_type = "favorite"
-                    target_id = raw_text
-                else:
-                    bvid = self.api.extract_bvid(raw_text)
-                    if bvid:
-                        target_type = "video"
-                        target_id = bvid
-
-        if not target_id:
-            QMessageBox.warning(self, "解析错误", "未能从输入中提取出合法的 ID 或链接，请核对输入格式。")
-            return
-
-        type_names = {"video": "视频", "favorite": "收藏夹", "space": "UP主主页"}
-        desc = type_names.get(target_type, "资源")
-        self.txt_log.append(f"正在从 B站 API 解析{desc} [{target_id}]...")
+        self.txt_log.append(f"正在后台解析资源 [{raw_text[:60]}]...")
         self.btn_parse.setEnabled(False)
 
-        self.parse_worker = MediaParseWorker(self.api, target_type, target_id)
+        self.parse_worker = MediaParseWorker(self.api, raw_text=raw_text, mode_idx=mode_idx)
         self.parse_worker.finished_signal.connect(self._on_video_info_parsed)
         self.parse_worker.start()
 

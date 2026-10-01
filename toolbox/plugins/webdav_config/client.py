@@ -5,6 +5,7 @@ WebDAV 核心协议驱动与客户端 (WebDAV Client)
 """
 
 import os
+import sys
 import subprocess
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -261,3 +262,71 @@ def unmount_webdav_drive(drive_letter: str) -> Tuple[bool, str]:
         return False, f"断开失败: {proc.stderr.strip()}"
     except Exception as e:
         return False, f"卸载异常: {e}"
+
+
+# -------------------------------------------------------------
+# Windows WebClient 注册表环境诊断与一键优化
+# -------------------------------------------------------------
+WEBCLIENT_REG_PATH = r"SYSTEM\CurrentControlSet\Services\WebClient\Parameters"
+
+
+def diagnose_webclient_registry() -> Dict[str, Any]:
+    """
+    诊断 Windows 系统 WebClient 注册表项：
+    - BasicAuthLevel: 默认值 1 (仅允许 HTTPS Basic 认证)，若为 1 则无法直接挂载 HTTP WebDAV
+    - FileSizeLimitInBytes: 默认 50000000 (~50MB)，超过此大小的文件传输将报错 0x800700DF
+    """
+    if sys.platform != "win32":
+        return {"supported": False, "error": "仅支持 Windows 系统"}
+
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, WEBCLIENT_REG_PATH, 0, winreg.KEY_READ) as key:
+            try:
+                auth_val, _ = winreg.QueryValueEx(key, "BasicAuthLevel")
+            except FileNotFoundError:
+                auth_val = 1
+
+            try:
+                size_val, _ = winreg.QueryValueEx(key, "FileSizeLimitInBytes")
+            except FileNotFoundError:
+                size_val = 50000000
+
+            return {
+                "supported": True,
+                "basic_auth_level": int(auth_val),
+                "file_size_limit": int(size_val),
+                "http_allowed": int(auth_val) >= 2,
+                "large_file_unlocked": int(size_val) >= 4294967295 or int(size_val) >= 4000000000,
+                "needs_fix": (int(auth_val) < 2 or int(size_val) < 4000000000)
+            }
+    except Exception as e:
+        return {"supported": True, "error": str(e), "needs_fix": False}
+
+
+def fix_webclient_registry() -> Tuple[bool, str]:
+    """
+    一键修复 Windows WebClient 注册表限制：
+    - 将 BasicAuthLevel 设置为 2 (允许 HTTP/HTTPS Basic 认证)
+    - 将 FileSizeLimitInBytes 设置为 4294967295 (解锁 4GB 单文件传输上限)
+    - 重启 WebClient 服务使配置即时生效
+    """
+    if sys.platform != "win32":
+        return False, "仅支持 Windows 系统"
+
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, WEBCLIENT_REG_PATH, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, "BasicAuthLevel", 0, winreg.REG_DWORD, 2)
+            winreg.SetValueEx(key, "FileSizeLimitInBytes", 0, winreg.REG_DWORD, 4294967295)
+
+        # 尝试静默重启 WebClient 服务以应用新配置
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        subprocess.run(["net", "stop", "WebClient"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+        subprocess.run(["net", "start", "WebClient"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+
+        return True, "已成功优化 WebClient 注册表配置（已解除 50MB 传输限制并启用 HTTP 基础认证）"
+    except PermissionError:
+        return False, "权限不足：修改 WebClient 系统注册表需要管理员权限，请以管理员身份运行工具箱后重试。"
+    except Exception as e:
+        return False, f"优化 WebClient 注册表失败: {e}"

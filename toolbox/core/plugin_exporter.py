@@ -19,6 +19,19 @@ class PluginExporter:
     独立插件安装包与便携包生成引擎 (支持原生 Inno Setup EXE 安装包与绿色便携包)
     """
 
+    PLUGIN_BIN_REQUIREMENTS = {
+        "media_downloader": ["ffmpeg.exe"],
+        "youtube_downloader": ["ffmpeg.exe"],
+        "video_to_audio": ["ffmpeg.exe"],
+        "audio_converter": ["ffmpeg.exe"],
+        "frame_extractor": ["ffmpeg.exe"],
+        "audio_cutter": ["ffmpeg.exe", "ffprobe.exe"],
+        "media_compressor": ["ffmpeg.exe", "ffprobe.exe"],
+        "screen_recorder": ["ffmpeg.exe"],
+        "audio_recorder": ["ffmpeg.exe"],
+        "archive_manager": ["7z.exe", "7z.dll"],
+    }
+
     @staticmethod
     def find_iscc_executable() -> Optional[str]:
         """
@@ -287,21 +300,14 @@ Filename: "{{app}}\\launch.bat"; Description: "立即启动 {plugin_name}"; Flag
                         shutil.copy2(cand, os.path.join(target_dir, "app_icon.png"))
                         break
 
-            # 3. 智能关联并复制所需的二进制依赖 (FFmpeg, 7-Zip 等)
+            # 3. 智能关联并按需精准复制所需的二进制依赖 (避免盲目全量打包导致包体膨胀 300MB+)
             bin_target = os.path.join(target_dir, "bin")
             os.makedirs(bin_target, exist_ok=True)
-            media_plugins = {"media_downloader", "youtube_downloader", "screen_recorder", "video_to_audio", "audio_converter", "audio_cutter", "media_compressor", "frame_extractor", "audio_recorder"}
-            archive_plugins = {"archive_manager"}
-            if plugin_id in media_plugins:
-                for b_tool in ["ffmpeg.exe", "ffprobe.exe", "ffplay.exe"]:
-                    b_file = get_bin_path(b_tool)
-                    if b_file and os.path.isfile(b_file):
-                        shutil.copy2(b_file, os.path.join(bin_target, b_tool))
-            if plugin_id in archive_plugins:
-                for b_tool in ["7z.exe", "7z.dll"]:
-                    b_file = get_bin_path(b_tool)
-                    if b_file and os.path.isfile(b_file):
-                        shutil.copy2(b_file, os.path.join(bin_target, b_tool))
+            needed_tools = cls.PLUGIN_BIN_REQUIREMENTS.get(plugin_id, [])
+            for b_tool in needed_tools:
+                b_file = get_bin_path(b_tool)
+                if b_file and os.path.isfile(b_file):
+                    shutil.copy2(b_file, os.path.join(bin_target, b_tool))
 
             # 4. 生成独立应用直达启动入口 standalone_entry.py
             entry_code = f'''"""
@@ -375,16 +381,16 @@ if exist "{py_exe_cur}" (
     start "" "{py_exe_cur}" "%~dp0standalone_entry.py" %*
     exit /b 0
 )
-if exist "%~dp0..\..\.venv\Scripts\pythonw.exe" (
-    start "" "%~dp0..\..\.venv\Scripts\pythonw.exe" "%~dp0standalone_entry.py" %*
+if exist "%~dp0..\\..\\.venv\\Scripts\\pythonw.exe" (
+    start "" "%~dp0..\\..\\.venv\\Scripts\\pythonw.exe" "%~dp0standalone_entry.py" %*
     exit /b 0
 )
-if exist "%~dp0..\.venv\Scripts\pythonw.exe" (
-    start "" "%~dp0..\.venv\Scripts\pythonw.exe" "%~dp0standalone_entry.py" %*
+if exist "%~dp0..\\.venv\\Scripts\\pythonw.exe" (
+    start "" "%~dp0..\\.venv\\Scripts\\pythonw.exe" "%~dp0standalone_entry.py" %*
     exit /b 0
 )
-if exist "%~dp0.venv\Scripts\pythonw.exe" (
-    start "" "%~dp0.venv\Scripts\pythonw.exe" "%~dp0standalone_entry.py" %*
+if exist "%~dp0.venv\\Scripts\\pythonw.exe" (
+    start "" "%~dp0.venv\\Scripts\\pythonw.exe" "%~dp0standalone_entry.py" %*
     exit /b 0
 )
 where pythonw >nul 2>nul
@@ -546,10 +552,10 @@ echo.
 set "PY_BIN="
 if exist "{py_exe_cur}" set "PY_BIN={py_exe_cur}"
 if not defined PY_BIN (
-    if exist "%~dp0..\..\.venv\Scripts\python.exe" set "PY_BIN=%~dp0..\..\.venv\Scripts\python.exe"
+    if exist "%~dp0..\\..\\.venv\\Scripts\\python.exe" set "PY_BIN=%~dp0..\\..\\.venv\\Scripts\\python.exe"
 )
 if not defined PY_BIN (
-    if exist "%~dp0..\.venv\Scripts\python.exe" set "PY_BIN=%~dp0..\.venv\Scripts\python.exe"
+    if exist "%~dp0..\\.venv\\Scripts\\python.exe" set "PY_BIN=%~dp0..\\.venv\\Scripts\\python.exe"
 )
 if not defined PY_BIN (
     where python >nul 2>nul

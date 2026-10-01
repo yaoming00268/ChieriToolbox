@@ -213,7 +213,7 @@ def set_git_proxy(enabled: bool, proxy_addr: str = "") -> Tuple[bool, str]:
 # -------------------------------------------------------------
 # 4. Pip 代理与镜像源 (Pip Proxy & Mirrors)
 # -------------------------------------------------------------
-def _get_pip_executable() -> str:
+def _get_pip_executable() -> Optional[str]:
     """自适应探测 Python / Pip 执行程序，兼顾源码开发态与便携打包态"""
     try:
         from toolbox.core.paths import get_app_root
@@ -223,13 +223,23 @@ def _get_pip_executable() -> str:
     except Exception:
         pass
     py = shutil.which("python") or shutil.which("python3")
-    return py if py else "python"
+    if py and os.path.isfile(py):
+        return py
+    return None
 
 
 def get_pip_status() -> Dict:
-    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     py_exe = _get_pip_executable()
+    if not py_exe:
+        return {
+            "enabled": False,
+            "proxy": "",
+            "index_url": "",
+            "available": False,
+            "message": "未检测到可用的 Python/Pip 运行时"
+        }
 
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     proxy_val = ""
     index_val = ""
     try:
@@ -246,14 +256,17 @@ def get_pip_status() -> Dict:
     return {
         "enabled": bool(proxy_val),
         "proxy": proxy_val,
-        "index_url": index_val
+        "index_url": index_val,
+        "available": True
     }
 
 
 def set_pip_proxy(enabled: bool, proxy_addr: str = "") -> Tuple[bool, str]:
-    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     py_exe = _get_pip_executable()
+    if not py_exe:
+        return False, "未检测到可用的 Python/Pip 运行时环境，无法配置 Pip 代理。"
 
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     try:
         if enabled and proxy_addr:
             formatted = proxy_addr if proxy_addr.startswith("http") or proxy_addr.startswith("socks5") else f"http://{proxy_addr}"
@@ -267,9 +280,11 @@ def set_pip_proxy(enabled: bool, proxy_addr: str = "") -> Tuple[bool, str]:
 
 
 def set_pip_mirror(mirror_url: str) -> Tuple[bool, str]:
-    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     py_exe = _get_pip_executable()
+    if not py_exe:
+        return False, "未检测到可用的 Python/Pip 运行时环境，无法配置 Pip 镜像源。"
 
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     try:
         subprocess.run([py_exe, "-m", "pip", "config", "set", "global.index-url", mirror_url], check=True, creationflags=creationflags)
         return True, f"Pip 镜像源已切换至: {mirror_url}"
@@ -440,20 +455,112 @@ def get_pac_proxy_status() -> Dict[str, Any]:
         return {"enabled": False, "pac_url": "", "error": str(e)}
 
 
+import http.server
+import threading
+
+
+class _LocalPACHandler(http.server.BaseHTTPRequestHandler):
+    pac_content = b""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ns-proxy-autoconfig")
+        self.send_header("Content-Length", str(len(_LocalPACHandler.pac_content)))
+        self.end_headers()
+        self.wfile.write(_LocalPACHandler.pac_content)
+
+    def log_message(self, format, *args):
+        pass
+
+
+class LocalPACServer:
+    """本地轻量级 HTTP PAC 服务托管器，彻底解决现代浏览器禁用 file:/// 协议加载 PAC 脚本的问题"""
+    _instance = None
+    _lock = threading.Lock()
+
+    def __init__(self):
+        self.httpd = None
+        self.port = 0
+        self.thread = None
+
+    @classmethod
+    def get_instance(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = LocalPACServer()
+            return cls._instance
+
+    def start(self, pac_file_path: str) -> Tuple[bool, str]:
+        with self._lock:
+            self.stop()
+            try:
+                with open(pac_file_path, "rb") as f:
+                    _LocalPACHandler.pac_content = f.read()
+
+                self.httpd = http.server.HTTPServer(("127.0.0.1", 0), _LocalPACHandler)
+                self.port = self.httpd.server_port
+                self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+                self.thread.start()
+                return True, f"http://127.0.0.1:{self.port}/proxy.pac"
+            except Exception as e:
+                return False, str(e)
+
+    def stop(self):
+        if self.httpd:
+            try:
+                self.httpd.shutdown()
+                self.httpd.server_close()
+            except Exception:
+                pass
+            self.httpd = None
+            self.port = 0
+            self.thread = None
+
+
+import atexit
+
+def _cleanup_local_pac():
+    try:
+        server = LocalPACServer.get_instance()
+        if server.httpd:
+            server.stop()
+            if sys.platform == "win32":
+                reg_path = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+                try:
+                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_READ | winreg.KEY_SET_VALUE) as key:
+                        try:
+                            cur_url, _ = winreg.QueryValueEx(key, "AutoConfigURL")
+                            if "127.0.0.1" in str(cur_url):
+                                winreg.DeleteValue(key, "AutoConfigURL")
+                                refresh_system_internet_options()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+atexit.register(_cleanup_local_pac)
+
+
 def set_pac_proxy(enabled: bool, pac_file_or_url: str = "") -> Tuple[bool, str]:
     """配置或清除 Windows 系统 Internet Settings 的 PAC 自动分流脚本 (AutoConfigURL)"""
     reg_path = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+    pac_server = LocalPACServer.get_instance()
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE) as key:
             if enabled and pac_file_or_url:
-                if os.path.isabs(pac_file_or_url):
-                    norm = pac_file_or_url.replace("\\", "/")
-                    pac_uri = f"file:///{norm}"
+                if os.path.isfile(pac_file_or_url):
+                    ok, pac_uri = pac_server.start(pac_file_or_url)
+                    if not ok:
+                        return False, f"启动本地 PAC 服务失败: {pac_uri}"
                 else:
+                    pac_server.stop()
                     pac_uri = pac_file_or_url
                 winreg.SetValueEx(key, "AutoConfigURL", 0, winreg.REG_SZ, pac_uri)
                 status_text = f"系统 PAC 智能分流已启用: {pac_uri}"
             else:
+                pac_server.stop()
                 try:
                     winreg.DeleteValue(key, "AutoConfigURL")
                 except FileNotFoundError:
@@ -466,90 +573,11 @@ def set_pac_proxy(enabled: bool, pac_file_or_url: str = "") -> Tuple[bool, str]:
         return False, f"配置系统 PAC 脚本失败: {e}"
 
 
-
 # -------------------------------------------------------------
 # 7. 注册表应用扫描与单独应用代理启动 (Per-App Proxy)
 # -------------------------------------------------------------
-def scan_registry_installed_apps() -> List[Dict[str, str]]:
-    """扫描 Windows 注册表已安装软件列表 (HKLM & HKCU, 包含 32/64 位)"""
-    apps = []
-    seen = set()
-    import re
+from toolbox.core.paths import scan_registry_installed_apps
 
-    roots = [
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ | getattr(winreg, "KEY_WOW64_64KEY", 0)),
-        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ | getattr(winreg, "KEY_WOW64_32KEY", 0)),
-        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ),
-    ]
-
-    for hkey, subkey_path, access_mask in roots:
-        try:
-            with winreg.OpenKey(hkey, subkey_path, 0, access_mask) as root_key:
-                num_subkeys, _, _ = winreg.QueryInfoKey(root_key)
-                for i in range(num_subkeys):
-                    try:
-                        sub_name = winreg.EnumKey(root_key, i)
-                        with winreg.OpenKey(root_key, sub_name, 0, access_mask) as app_key:
-                            def _get_val(k):
-                                try:
-                                    v, _ = winreg.QueryValueEx(app_key, k)
-                                    return str(v).strip()
-                                except Exception:
-                                    return ""
-
-                            disp_name = _get_val("DisplayName")
-                            if not disp_name or _get_val("SystemComponent") == "1":
-                                continue
-
-                            disp_ver = _get_val("DisplayVersion")
-                            pub = _get_val("Publisher")
-                            inst_loc = _get_val("InstallLocation")
-                            disp_icon = _get_val("DisplayIcon")
-                            uninst_str = _get_val("UninstallString")
-
-                            exe_path = ""
-                            if disp_icon:
-                                raw_icon = disp_icon.split(",")[0].strip('"')
-                                if raw_icon.lower().endswith(".exe") and os.path.isfile(raw_icon):
-                                    exe_path = raw_icon
-
-                            if not exe_path and inst_loc and os.path.isdir(inst_loc):
-                                try:
-                                    for f in os.listdir(inst_loc):
-                                        if f.lower().endswith(".exe"):
-                                            candidate = os.path.join(inst_loc, f)
-                                            if os.path.isfile(candidate):
-                                                exe_path = candidate
-                                                break
-                                except Exception:
-                                    pass
-
-                            if not inst_loc and exe_path:
-                                inst_loc = os.path.dirname(exe_path)
-                            elif not inst_loc and uninst_str:
-                                m = re.search(r'["\']?([^"\']+\.exe)["\']?', uninst_str, re.IGNORECASE)
-                                if m and os.path.isfile(m.group(1)):
-                                    inst_loc = os.path.dirname(m.group(1))
-
-                            key_id = f"{disp_name}_{disp_ver}".lower()
-                            if key_id not in seen:
-                                seen.add(key_id)
-                                apps.append({
-                                    "name": disp_name,
-                                    "version": disp_ver,
-                                    "publisher": pub,
-                                    "install_location": inst_loc,
-                                    "exe_path": exe_path,
-                                    "uninstall_string": uninst_str,
-                                    "registry_key": sub_name
-                                })
-                    except Exception:
-                        continue
-        except Exception:
-            continue
-
-    apps.sort(key=lambda x: x["name"].lower())
-    return apps
 
 
 def launch_app_with_proxy(exe_path: str, proxy_addr: str) -> Tuple[bool, str]:

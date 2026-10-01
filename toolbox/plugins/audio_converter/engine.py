@@ -51,7 +51,19 @@ def convert_audio(
     if not ff or not os.path.isfile(ff):
         return False, "未找到 FFmpeg 核心引擎，请确认 bin/ffmpeg.exe 存在。"
 
-    os.makedirs(os.path.dirname(os.path.abspath(output_audio)), exist_ok=True)
+    input_norm = os.path.normcase(os.path.abspath(input_audio))
+    output_norm = os.path.normcase(os.path.abspath(output_audio))
+    is_same = (input_norm == output_norm)
+    if not is_same and os.path.exists(input_audio) and os.path.exists(output_audio):
+        try:
+            is_same = os.path.samefile(input_audio, output_audio)
+        except Exception:
+            pass
+
+    out_dir = os.path.dirname(os.path.abspath(output_audio))
+    os.makedirs(out_dir, exist_ok=True)
+
+    target_out = os.path.join(out_dir, f"._conv_tmp_{os.getpid()}_{os.path.basename(output_audio)}") if is_same else output_audio
 
     cmd = [ff, "-y", "-i", input_audio]
 
@@ -89,7 +101,7 @@ def convert_audio(
     if channels:
         cmd.extend(["-ac", str(channels)])
 
-    cmd.append(output_audio)
+    cmd.append(target_out)
 
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     try:
@@ -103,13 +115,30 @@ def convert_audio(
             errors="ignore",
             timeout=300
         )
-        if proc.returncode == 0 and os.path.exists(output_audio):
+        if proc.returncode == 0 and os.path.exists(target_out):
+            if is_same:
+                os.replace(target_out, output_audio)
             return True, output_audio
         else:
+            if is_same and os.path.exists(target_out):
+                try:
+                    os.remove(target_out)
+                except Exception:
+                    pass
             return False, proc.stderr[-400:] if proc.stderr else f"退出码: {proc.returncode}"
     except subprocess.TimeoutExpired:
+        if is_same and os.path.exists(target_out):
+            try:
+                os.remove(target_out)
+            except Exception:
+                pass
         return False, "音频转换处理超时 (超过 300 秒)"
     except Exception as e:
+        if is_same and os.path.exists(target_out):
+            try:
+                os.remove(target_out)
+            except Exception:
+                pass
         return False, str(e)
 
 

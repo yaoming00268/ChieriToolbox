@@ -9,7 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 
 def is_frozen() -> bool:
@@ -164,10 +164,26 @@ def find_ffmpeg_executable() -> Optional[str]:
     return None
 
 
-def sanitize_filename(name: str) -> str:
-    """清理 Windows 文件名非法字符"""
+WINDOWS_RESERVED_NAMES = {
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+}
+
+
+def sanitize_filename(name: str, max_length: int = 120) -> str:
+    """清理 Windows 文件名非法字符、保留设备名及限制长度防止 MAX_PATH 溢出"""
     clean = re.sub(r'[\\/*?:"<>|\r\n\t]', "_", name).strip(". ")
-    return clean if clean else "video"
+    if not clean:
+        return "video"
+    base, ext = os.path.splitext(clean)
+    if base.upper() in WINDOWS_RESERVED_NAMES:
+        base = f"_{base}"
+    if len(base + ext) > max_length:
+        max_base_len = max(1, max_length - len(ext))
+        base = base[:max_base_len].rstrip(". ")
+    result = base + ext
+    return result if result else "video"
 
 
 def get_audio_input_devices() -> List[str]:
@@ -224,4 +240,96 @@ def get_audio_input_devices() -> List[str]:
     if not devices:
         devices = ["默认音频输入设备"]
     return devices
+
+
+def scan_registry_installed_apps() -> List[Dict[str, str]]:
+    """
+    扫描 Windows 注册表已安装软件 (HKLM & HKCU, 包含 32/64 位)。
+    提取应用名称、版本、安装目录、主执行程序与卸载命令，便于强制解除占用与顽固卸载粉碎。
+    """
+    if sys.platform != "win32":
+        return []
+
+    try:
+        import winreg
+    except ImportError:
+        return []
+
+    apps = []
+    seen = set()
+
+    roots = [
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ | getattr(winreg, "KEY_WOW64_64KEY", 0)),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ | getattr(winreg, "KEY_WOW64_32KEY", 0)),
+        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall", winreg.KEY_READ),
+    ]
+
+    for hkey, subkey_path, access_mask in roots:
+        try:
+            with winreg.OpenKey(hkey, subkey_path, 0, access_mask) as root_key:
+                num_subkeys, _, _ = winreg.QueryInfoKey(root_key)
+                for i in range(num_subkeys):
+                    try:
+                        sub_name = winreg.EnumKey(root_key, i)
+                        with winreg.OpenKey(root_key, sub_name, 0, access_mask) as app_key:
+                            def _get_val(k):
+                                try:
+                                    v, _ = winreg.QueryValueEx(app_key, k)
+                                    return str(v).strip()
+                                except Exception:
+                                    return ""
+
+                            disp_name = _get_val("DisplayName")
+                            if not disp_name or _get_val("SystemComponent") == "1":
+                                continue
+
+                            disp_ver = _get_val("DisplayVersion")
+                            pub = _get_val("Publisher")
+                            inst_loc = _get_val("InstallLocation")
+                            disp_icon = _get_val("DisplayIcon")
+                            uninst_str = _get_val("UninstallString")
+
+                            exe_path = ""
+                            if disp_icon:
+                                raw_icon = disp_icon.split(",")[0].strip('"')
+                                if raw_icon.lower().endswith(".exe") and os.path.isfile(raw_icon):
+                                    exe_path = raw_icon
+
+                            if not exe_path and inst_loc and os.path.isdir(inst_loc):
+                                try:
+                                    for f in os.listdir(inst_loc):
+                                        if f.lower().endswith(".exe"):
+                                            candidate = os.path.join(inst_loc, f)
+                                            if os.path.isfile(candidate):
+                                                exe_path = candidate
+                                                break
+                                except Exception:
+                                    pass
+
+                            if not inst_loc and exe_path:
+                                inst_loc = os.path.dirname(exe_path)
+                            elif not inst_loc and uninst_str:
+                                m = re.search(r'["\']?([^"\']+\.exe)["\']?', uninst_str, re.IGNORECASE)
+                                if m and os.path.isfile(m.group(1)):
+                                    inst_loc = os.path.dirname(m.group(1))
+
+                            key_id = f"{disp_name}_{disp_ver}".lower()
+                            if key_id not in seen:
+                                seen.add(key_id)
+                                apps.append({
+                                    "name": disp_name,
+                                    "version": disp_ver,
+                                    "publisher": pub,
+                                    "install_location": inst_loc,
+                                    "exe_path": exe_path,
+                                    "uninstall_string": uninst_str,
+                                    "registry_key": sub_name
+                                })
+                    except Exception:
+                        continue
+        except Exception:
+            continue
+
+    apps.sort(key=lambda x: x["name"].lower())
+    return apps
 

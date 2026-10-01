@@ -69,7 +69,8 @@ class MediaDownloadWorker(QThread):
         audio_format: str = "mp3",
         ffmpeg_path: Optional[str] = None,
         cookie: Optional[str] = None,
-        headers: Optional[dict] = None
+        headers: Optional[dict] = None,
+        proxies: Optional[dict] = None
     ):
         super().__init__()
         self.video_url = video_url
@@ -81,6 +82,7 @@ class MediaDownloadWorker(QThread):
         self.ffmpeg_path = ffmpeg_path or find_ffmpeg_executable()
         self.cookie = normalize_cookie(cookie) if cookie else ""
         self.custom_headers = headers or {}
+        self.proxies = proxies
         self._is_cancelled = False
         self._is_paused = False
         self._pause_event = threading.Event()
@@ -252,6 +254,7 @@ class MediaDownloadWorker(QThread):
 
             creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 
+            last_stderr = ""
             if has_audio:
                 # 优先尝试无损 stream copy (-c:v copy -c:a copy)
                 cmd = [
@@ -262,8 +265,11 @@ class MediaDownloadWorker(QThread):
                     "-c:a", "copy",
                     out_mp4
                 ]
-                self._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
-                ret = self._proc.wait()
+                self._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=creationflags)
+                _, stderr_out = self._proc.communicate()
+                ret = self._proc.returncode
+                if stderr_out:
+                    last_stderr = stderr_out.decode("utf-8", errors="ignore")
                 if self._is_cancelled:
                     self.finished_task.emit(False, "已取消")
                     return
@@ -278,8 +284,10 @@ class MediaDownloadWorker(QThread):
                         "-c:a", "aac",
                         out_mp4
                     ]
-                    self._proc = subprocess.Popen(cmd_fallback, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
-                    self._proc.wait()
+                    self._proc = subprocess.Popen(cmd_fallback, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=creationflags)
+                    _, stderr_out = self._proc.communicate()
+                    if stderr_out:
+                        last_stderr = stderr_out.decode("utf-8", errors="ignore")
             else:
                 # 无音频轨仅处理视频轨
                 cmd = [
@@ -288,16 +296,19 @@ class MediaDownloadWorker(QThread):
                     "-c:v", "copy",
                     out_mp4
                 ]
-                self._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
-                self._proc.wait()
+                self._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=creationflags)
+                _, stderr_out = self._proc.communicate()
+                if stderr_out:
+                    last_stderr = stderr_out.decode("utf-8", errors="ignore")
 
             if self._is_cancelled:
                 self.finished_task.emit(False, "已取消")
                 return
 
             if not os.path.exists(out_mp4) or os.path.getsize(out_mp4) == 0:
-                self.log_message.emit("[错误] FFmpeg 音视频混流失败，未生成有效视频文件")
-                self.finished_task.emit(False, "FFmpeg 音视频混流失败")
+                err_detail = last_stderr.strip()[-300:] if last_stderr else "未获取到 stderr 异常信息"
+                self.log_message.emit(f"[错误] FFmpeg 音视频混流失败: {err_detail}")
+                self.finished_task.emit(False, f"FFmpeg 音视频混流失败: {err_detail}")
                 return
 
             # 清理临时文件
@@ -352,7 +363,7 @@ class MediaDownloadWorker(QThread):
                 if downloaded > 0:
                     headers["Range"] = f"bytes={downloaded}-"
 
-                resp = requests.get(url, headers=headers, stream=True, timeout=20, proxies={"http": None, "https": None})
+                resp = requests.get(url, headers=headers, stream=True, timeout=20, proxies=self.proxies)
                 self._current_resp = resp
                 try:
                     if hasattr(resp, "raise_for_status"):
