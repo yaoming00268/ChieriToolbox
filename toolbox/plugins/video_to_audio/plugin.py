@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import VideoToAudioWidget
 
 
 class VideoToAudioPlugin(PluginBase):
@@ -18,4 +17,5 @@ class VideoToAudioPlugin(PluginBase):
     sort_order = 32
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import VideoToAudioWidget
         return VideoToAudioWidget(parent)

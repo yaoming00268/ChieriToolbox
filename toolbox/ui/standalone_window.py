@@ -81,6 +81,10 @@ class PluginStandaloneWindow(QMainWindow):
         # 若部件拥有专属持久化方法，自动调用
         central = self.takeCentralWidget()
         if central:
+            try:
+                central.hide()
+            except Exception:
+                pass
             if hasattr(central, "save_settings"):
                 try:
                     central.save_settings()

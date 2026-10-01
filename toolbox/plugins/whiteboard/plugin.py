@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import WhiteboardWidget
 
 
 class WhiteboardPlugin(PluginBase):
@@ -18,6 +17,7 @@ class WhiteboardPlugin(PluginBase):
     sort_order = 50
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import WhiteboardWidget
         return WhiteboardWidget(parent)
 
     def get_quick_actions(self, window=None) -> list:

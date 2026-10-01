@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import AudioConverterWidget
 
 
 class AudioConverterPlugin(PluginBase):
@@ -18,4 +17,5 @@ class AudioConverterPlugin(PluginBase):
     sort_order = 34
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import AudioConverterWidget
         return AudioConverterWidget(parent)

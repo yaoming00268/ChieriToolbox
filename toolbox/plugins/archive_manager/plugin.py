@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import ArchiveManagerWidget
 
 
 class ArchiveManagerPlugin(PluginBase):
@@ -18,4 +17,5 @@ class ArchiveManagerPlugin(PluginBase):
     sort_order = 15
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import ArchiveManagerWidget
         return ArchiveManagerWidget(parent)

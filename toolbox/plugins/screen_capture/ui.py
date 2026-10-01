@@ -592,8 +592,9 @@ class ScreenCaptureWidget(QWidget):
         if checked:
             if not self.xbox_overlay:
                 self.xbox_overlay = XboxCaptureOverlayWidget(self)
-            self.xbox_overlay.show()
-            self.xbox_overlay.raise_()
+            if self.isVisible():
+                self.xbox_overlay.show()
+                self.xbox_overlay.raise_()
         else:
             if self.xbox_overlay:
                 self.xbox_overlay.hide()
@@ -603,12 +604,13 @@ class ScreenCaptureWidget(QWidget):
         if not self.cb_xbox_overlay.isChecked():
             self.cb_xbox_overlay.setChecked(True)
         else:
-            if self.xbox_overlay:
-                if self.xbox_overlay.isVisible():
-                    self.xbox_overlay.hide()
-                else:
-                    self.xbox_overlay.show()
-                    self.xbox_overlay.raise_()
+            if not self.xbox_overlay:
+                self.xbox_overlay = XboxCaptureOverlayWidget(self)
+            if self.xbox_overlay.isVisible():
+                self.xbox_overlay.hide()
+            else:
+                self.xbox_overlay.show()
+                self.xbox_overlay.raise_()
 
     def _on_snip_overlay_closed(self):
         if getattr(self, "_window_was_visible", True) and self.window():
@@ -644,11 +646,13 @@ class ScreenCaptureWidget(QWidget):
 
     def _do_window_snip(self):
         pix, rect = grab_window_under_cursor()
-        if self.window():
+        if getattr(self, "_window_was_visible", True) and self.window():
             self.window().show()
+            self.window().raise_()
         if hasattr(self, "xbox_overlay") and self.xbox_overlay and self.cb_xbox_overlay.isChecked():
-            self.xbox_overlay.show()
-            self.xbox_overlay.raise_()
+            if self.isVisible():
+                self.xbox_overlay.show()
+                self.xbox_overlay.raise_()
         if not pix.isNull():
             self._handle_capture_result(pix, "copy")
 
@@ -660,6 +664,7 @@ class ScreenCaptureWidget(QWidget):
             delays = [0, 3, 5, 10]
             delay = delays[idx] if idx < len(delays) else 0
 
+        self._window_was_visible = self.window().isVisible() if self.window() else False
         if self.window():
             self.window().hide()
         if hasattr(self, "xbox_overlay") and self.xbox_overlay:
@@ -670,16 +675,19 @@ class ScreenCaptureWidget(QWidget):
 
     def _do_fullscreen_snip(self):
         pix = grab_fullscreen()
-        if self.window():
+        if getattr(self, "_window_was_visible", True) and self.window():
             self.window().show()
+            self.window().raise_()
         if hasattr(self, "xbox_overlay") and self.xbox_overlay and self.cb_xbox_overlay.isChecked():
-            self.xbox_overlay.show()
-            self.xbox_overlay.raise_()
+            if self.isVisible():
+                self.xbox_overlay.show()
+                self.xbox_overlay.raise_()
         if not pix.isNull():
             self._handle_capture_result(pix, "copy")
 
     def _add_long_segment(self):
         """长截图：捕获当前屏幕作为拼接段"""
+        self._window_was_visible = self.window().isVisible() if self.window() else False
         if self.window():
             self.window().hide()
         if hasattr(self, "xbox_overlay") and self.xbox_overlay:
@@ -688,11 +696,13 @@ class ScreenCaptureWidget(QWidget):
 
     def _do_add_long_segment(self):
         pix = grab_fullscreen()
-        if self.window():
+        if getattr(self, "_window_was_visible", True) and self.window():
             self.window().show()
+            self.window().raise_()
         if hasattr(self, "xbox_overlay") and self.xbox_overlay and self.cb_xbox_overlay.isChecked():
-            self.xbox_overlay.show()
-            self.xbox_overlay.raise_()
+            if self.isVisible():
+                self.xbox_overlay.show()
+                self.xbox_overlay.raise_()
         if not pix.isNull():
             self.long_segments.append(pix)
             self.lbl_long_info.setText(f"已捕获 {len(self.long_segments)} 段画面")
@@ -932,7 +942,9 @@ class ScreenCaptureWidget(QWidget):
             self.mode_tabs.setCurrentIndex(tab_idx)
 
         if hasattr(self, "cb_xbox_overlay"):
+            self.cb_xbox_overlay.blockSignals(True)
             self.cb_xbox_overlay.setChecked(cfg.get("xbox_overlay", False))
+            self.cb_xbox_overlay.blockSignals(False)
         if hasattr(self, "combo_full_delay"):
             self.combo_full_delay.setCurrentIndex(cfg.get("full_delay_idx", 0))
         if hasattr(self, "combo_full_scope"):
@@ -951,8 +963,6 @@ class ScreenCaptureWidget(QWidget):
             self.cb_win_shadow.setChecked(cfg.get("win_shadow", False))
 
         self._setup_shortcuts()
-        if hasattr(self, "cb_xbox_overlay"):
-            self._on_xbox_overlay_toggled(self.cb_xbox_overlay.isChecked())
 
     def save_settings(self):
         if not hasattr(self, "cb_copy") or not hasattr(self, "edit_key_rect"):
@@ -979,6 +989,23 @@ class ScreenCaptureWidget(QWidget):
             "win_shadow": self.cb_win_shadow.isChecked() if hasattr(self, "cb_win_shadow") else False,
         }
         self.config_manager.set_plugin_config(self.PLUGIN_ID, cfg)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "cb_xbox_overlay") and self.cb_xbox_overlay.isChecked():
+            if not self.xbox_overlay:
+                self.xbox_overlay = XboxCaptureOverlayWidget(self)
+            self.xbox_overlay.show()
+            self.xbox_overlay.raise_()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        if hasattr(self, "xbox_overlay") and self.xbox_overlay:
+            self.xbox_overlay.hide()
+
+    def on_deactivated(self):
+        if hasattr(self, "xbox_overlay") and self.xbox_overlay:
+            self.xbox_overlay.hide()
 
     def cleanup(self):
         self._clear_global_hotkeys()

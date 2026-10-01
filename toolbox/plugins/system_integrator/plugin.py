@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import SystemIntegratorWidget
 
 
 class SystemIntegratorPlugin(PluginBase):
@@ -18,4 +17,5 @@ class SystemIntegratorPlugin(PluginBase):
     sort_order = 60
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import SystemIntegratorWidget
         return SystemIntegratorWidget(parent)

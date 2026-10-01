@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import FrameExtractorWidget
 
 
 class FrameExtractorPlugin(PluginBase):
@@ -18,4 +17,5 @@ class FrameExtractorPlugin(PluginBase):
     sort_order = 24
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import FrameExtractorWidget
         return FrameExtractorWidget(parent)

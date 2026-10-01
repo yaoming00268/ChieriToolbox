@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import AutoInputWidget
 
 
 class AutoInputPlugin(PluginBase):
@@ -18,6 +17,7 @@ class AutoInputPlugin(PluginBase):
     sort_order = 30
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import AutoInputWidget
         return AutoInputWidget(parent)
 
     def on_deactivated(self):

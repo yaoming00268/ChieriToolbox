@@ -4,7 +4,6 @@ YouTube 视频下载器 - 插件接口定义
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import YoutubeDownloaderWidget
 
 
 class YoutubeDownloaderPlugin(PluginBase):
@@ -18,4 +17,5 @@ class YoutubeDownloaderPlugin(PluginBase):
     sort_order = 42
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import YoutubeDownloaderWidget
         return YoutubeDownloaderWidget(parent)

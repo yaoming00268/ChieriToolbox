@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import ScreenCaptureWidget
 
 
 class ScreenCapturePlugin(PluginBase):
@@ -18,6 +17,7 @@ class ScreenCapturePlugin(PluginBase):
     sort_order = 21
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import ScreenCaptureWidget
         return ScreenCaptureWidget(parent)
 
     def get_quick_actions(self, window=None) -> list:

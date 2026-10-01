@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import NcmDecryptorWidget
 
 
 class NcmDecryptorPlugin(PluginBase):
@@ -18,4 +17,5 @@ class NcmDecryptorPlugin(PluginBase):
     sort_order = 36
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import NcmDecryptorWidget
         return NcmDecryptorWidget(parent)

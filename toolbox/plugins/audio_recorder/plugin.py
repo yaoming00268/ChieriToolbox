@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import AudioRecorderWidget
 
 
 class AudioRecorderPlugin(PluginBase):
@@ -18,6 +17,7 @@ class AudioRecorderPlugin(PluginBase):
     sort_order = 34
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import AudioRecorderWidget
         return AudioRecorderWidget(parent)
 
     def get_quick_actions(self, window=None) -> list:

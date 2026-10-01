@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import ForceKillerWidget
 
 
 class ForceKillerPlugin(PluginBase):
@@ -18,4 +17,5 @@ class ForceKillerPlugin(PluginBase):
     sort_order = 62
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import ForceKillerWidget
         return ForceKillerWidget(parent)

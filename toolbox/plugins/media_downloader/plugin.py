@@ -4,7 +4,6 @@ B站媒体下载器 - 插件定义
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import MediaDownloaderWidget
 
 
 class MediaDownloaderPlugin(PluginBase):
@@ -18,4 +17,5 @@ class MediaDownloaderPlugin(PluginBase):
     sort_order = 40
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import MediaDownloaderWidget
         return MediaDownloaderWidget(parent)

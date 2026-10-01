@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import MediaCompressorWidget
 
 
 class MediaCompressorPlugin(PluginBase):
@@ -18,4 +17,5 @@ class MediaCompressorPlugin(PluginBase):
     sort_order = 23
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import MediaCompressorWidget
         return MediaCompressorWidget(parent)

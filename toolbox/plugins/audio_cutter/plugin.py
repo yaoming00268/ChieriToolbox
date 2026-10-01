@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import AudioCutterWidget
 
 
 class AudioCutterPlugin(PluginBase):
@@ -18,6 +17,7 @@ class AudioCutterPlugin(PluginBase):
     sort_order = 38
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import AudioCutterWidget
         return AudioCutterWidget(parent)
 
     def get_quick_actions(self, window=None) -> list:

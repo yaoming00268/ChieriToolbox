@@ -4,7 +4,6 @@
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import FileSuiteWidget
 
 
 class FileSuitePlugin(PluginBase):
@@ -18,4 +17,5 @@ class FileSuitePlugin(PluginBase):
     sort_order = 10
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import FileSuiteWidget
         return FileSuiteWidget(parent)

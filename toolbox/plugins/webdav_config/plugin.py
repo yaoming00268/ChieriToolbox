@@ -4,7 +4,6 @@ WebDAV 配置管理器 - 插件接口定义
 
 from PySide6.QtWidgets import QWidget
 from toolbox.core.plugin_base import PluginBase
-from .ui import WebDAVConfigWidget
 
 
 class WebDAVConfigPlugin(PluginBase):
@@ -18,4 +17,5 @@ class WebDAVConfigPlugin(PluginBase):
     sort_order = 40
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
+        from .ui import WebDAVConfigWidget
         return WebDAVConfigWidget(parent)

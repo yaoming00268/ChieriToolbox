@@ -41,9 +41,22 @@ class PluginBase(QObject):
         pass
 
     def get_widget(self, parent: Optional[QWidget] = None) -> QWidget:
-        """获取已实例化的 GUI 部件；若尚未创建则自动调用 create_widget()"""
+        """获取已实例化的 GUI 部件；若尚未创建或底层 C++ 对象已被销毁则自动重新调用 create_widget()"""
+        if self._widget is not None:
+            try:
+                # 探测底层 C++ 对象有效性 (若父级已被销毁导致子部件析构，将抛出 RuntimeError)
+                _ = self._widget.parent()
+            except RuntimeError:
+                self._widget = None
+
         if self._widget is None:
             self._widget = self.create_widget(parent)
+        elif parent is not None:
+            try:
+                if self._widget.parent() is None:
+                    self._widget.setParent(parent)
+            except RuntimeError:
+                self._widget = self.create_widget(parent)
         return self._widget
 
     def on_activated(self):
@@ -52,6 +65,14 @@ class PluginBase(QObject):
         可用于恢复监听、刷新数据或启动专属计时器。
         """
         self._is_active = True
+        if self._widget is not None:
+            try:
+                if hasattr(self._widget, "on_activated"):
+                    self._widget.on_activated()
+            except RuntimeError:
+                self._widget = None
+            except Exception as e:
+                print(f"[Plugin {self.id}] on_activated 异常: {e}")
 
     def on_deactivated(self):
         """
@@ -60,16 +81,17 @@ class PluginBase(QObject):
         """
         self._is_active = False
         if self._widget is not None:
-            if hasattr(self._widget, "save_settings"):
-                try:
+            try:
+                if hasattr(self._widget, "on_deactivated"):
+                    self._widget.on_deactivated()
+                if hasattr(self._widget, "save_settings"):
                     self._widget.save_settings()
-                except Exception as e:
-                    print(f"[Plugin {self.id}] 自动保存配置失败: {e}")
-            elif hasattr(self._widget, "save_config"):
-                try:
+                elif hasattr(self._widget, "save_config"):
                     self._widget.save_config()
-                except Exception as e:
-                    print(f"[Plugin {self.id}] 自动保存配置失败: {e}")
+            except RuntimeError:
+                self._widget = None
+            except Exception as e:
+                print(f"[Plugin {self.id}] on_deactivated 异常: {e}")
 
     def is_active(self) -> bool:
         """返回当前插件是否处于前台激活状态"""
@@ -79,12 +101,12 @@ class PluginBase(QObject):
         """
         处理外部传入的文件/文件夹或URL参数
         """
-        widget = self.get_widget()
-        if widget and hasattr(widget, "handle_initial_paths"):
-            try:
+        try:
+            widget = self.get_widget()
+            if widget and hasattr(widget, "handle_initial_paths"):
                 widget.handle_initial_paths(paths)
-            except Exception as e:
-                print(f"[Plugin {self.id}] 处理初始路径失败: {e}")
+        except Exception as e:
+            print(f"[Plugin {self.id}] 处理初始路径失败: {e}")
 
     def cleanup(self):
         """

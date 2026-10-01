@@ -44,3 +44,6 @@ toolbox_config.json
 bin/ffmpeg.exe
 bin/ffplay.exe
 bin/ffprobe.exe
+
+# Temporary scratch scripts
+scratch/
