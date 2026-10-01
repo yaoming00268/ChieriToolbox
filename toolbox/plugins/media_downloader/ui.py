@@ -5,15 +5,22 @@ B站媒体下载器 - 现代化 GUI 界面
 import os
 import requests
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtGui import QPixmap, QImage, QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QComboBox, QCheckBox, QProgressBar, QTextEdit,
-    QFileDialog, QMessageBox, QGroupBox, QListWidget, QListWidgetItem
+    QFileDialog, QMessageBox, QGroupBox, QListWidget, QListWidgetItem,
+    QMenu
 )
 from toolbox.core.config_manager import ConfigManager
 from .api import BiliApiClient, QUALITY_MAP, VIP_QN_SET, normalize_cookie
-from .downloader import MediaDownloadWorker, BatchMediaDownloadWorker, find_ffmpeg_executable
+from .downloader import (
+    MediaDownloadWorker,
+    BatchMediaDownloadWorker,
+    find_ffmpeg_executable,
+    check_item_downloaded,
+    get_task_target_filename
+)
 
 
 class ImageFetchThread(QThread):
@@ -276,6 +283,11 @@ class MediaDownloaderWidget(QWidget):
         self.btn_select_invert.clicked.connect(self._invert_selection)
         top_list_h.addWidget(self.btn_select_invert)
 
+        self.btn_detect_downloaded = QPushButton("检测已下载")
+        self.btn_detect_downloaded.setToolTip("扫描下载保存目录，自动识别已下载完成的文件并更新勾选状态")
+        self.btn_detect_downloaded.clicked.connect(self._detect_downloaded_items_manual)
+        top_list_h.addWidget(self.btn_detect_downloaded)
+
         self.lbl_selected_count = QLabel("已勾选: 0/0")
         self.lbl_selected_count.setStyleSheet("color: #64748b; font-size: 12px; font-weight: bold;")
         top_list_h.addWidget(self.lbl_selected_count)
@@ -283,6 +295,8 @@ class MediaDownloaderWidget(QWidget):
         right_card_layout.addLayout(top_list_h)
 
         self.list_pages = QListWidget()
+        self.list_pages.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list_pages.customContextMenuRequested.connect(self._show_list_context_menu)
         self.list_pages.itemChanged.connect(self._on_item_check_state_changed)
         self.list_pages.currentItemChanged.connect(self._on_list_item_selection_changed)
         right_card_layout.addWidget(self.list_pages, 1)
@@ -290,7 +304,7 @@ class MediaDownloaderWidget(QWidget):
         # 画质下拉与音频格式设置
         opt_h = QHBoxLayout()
         opt_h.setSpacing(8)
-        opt_h.addWidget(QLabel("目标画质:"))
+        opt_h.addWidget(QLabel("全局画质:"))
         self.combo_quality = QComboBox()
         self._populate_qualities([])
         opt_h.addWidget(self.combo_quality)
@@ -306,8 +320,41 @@ class MediaDownloaderWidget(QWidget):
         self.combo_audio_format.currentIndexChanged.connect(self.save_settings)
         opt_h.addWidget(self.combo_audio_format)
 
+        self.cb_skip_existing = QCheckBox("跳过已存在")
+        self.cb_skip_existing.setChecked(True)
+        self.cb_skip_existing.setToolTip("开启后，目标目录已存在的完整文件将自动跳过下载")
+        opt_h.addWidget(self.cb_skip_existing)
+
         opt_h.addStretch()
         right_card_layout.addLayout(opt_h)
+
+        # 单项画质微调与批量应用
+        item_opt_h = QHBoxLayout()
+        item_opt_h.setSpacing(8)
+        item_opt_h.addWidget(QLabel("选中项画质:"))
+        self.combo_item_quality = QComboBox()
+        self.combo_item_quality.setMinimumWidth(160)
+        self.combo_item_quality.addItem("遵循全局画质 (默认)", None)
+        for qn_val in (127, 120, 116, 80, 64, 32, 16):
+            q_name = QUALITY_MAP.get(qn_val, f"{qn_val}P")
+            if qn_val in VIP_QN_SET:
+                q_name = f"{q_name} [大会员]"
+            self.combo_item_quality.addItem(q_name, qn_val)
+        self.combo_item_quality.setEnabled(False)
+        self.combo_item_quality.currentIndexChanged.connect(self._on_item_quality_combo_changed)
+        item_opt_h.addWidget(self.combo_item_quality)
+
+        self.btn_apply_quality_to_checked = QPushButton("应用至所有勾选项")
+        self.btn_apply_quality_to_checked.setEnabled(False)
+        self.btn_apply_quality_to_checked.setToolTip("将此处选择的画质批量应用给所有当前勾选的视频/分P")
+        self.btn_apply_quality_to_checked.clicked.connect(self._apply_quality_to_checked)
+        item_opt_h.addWidget(self.btn_apply_quality_to_checked)
+
+        self.lbl_item_quality_tip = QLabel("(右键列表项也可快捷设置画质)")
+        self.lbl_item_quality_tip.setStyleSheet("color: #64748b; font-size: 11px;")
+        item_opt_h.addWidget(self.lbl_item_quality_tip)
+        item_opt_h.addStretch()
+        right_card_layout.addLayout(item_opt_h)
 
         content_box.addWidget(right_card, 2)
         main_layout.addLayout(content_box, 1)
@@ -322,6 +369,7 @@ class MediaDownloaderWidget(QWidget):
         self.le_save_dir = QLineEdit()
         def_dl = os.path.join(os.path.expanduser("~"), "Downloads", "bilibili")
         self.le_save_dir.setText(def_dl)
+        self.le_save_dir.textChanged.connect(lambda: self._detect_downloaded_items(auto_uncheck=False))
         path_h.addWidget(self.le_save_dir, 1)
         btn_browse = QPushButton("浏览...")
         btn_browse.clicked.connect(self._browse_dir)
@@ -344,13 +392,27 @@ class MediaDownloaderWidget(QWidget):
 
         self.btn_download = QPushButton("开始下载")
         self.btn_download.setObjectName("primaryBtn")
-        self.btn_download.setMinimumWidth(130)
+        self.btn_download.setMinimumWidth(110)
         self.btn_download.setEnabled(False)
         self.btn_download.clicked.connect(self._start_download)
         ctl_h.addWidget(self.btn_download)
 
+        self.btn_pause_resume = QPushButton("暂停")
+        self.btn_pause_resume.setEnabled(False)
+        self.btn_pause_resume.setMinimumWidth(75)
+        self.btn_pause_resume.clicked.connect(self._toggle_pause_resume)
+        ctl_h.addWidget(self.btn_pause_resume)
+
+        self.btn_retry_failed = QPushButton("重试未下载")
+        self.btn_retry_failed.setEnabled(False)
+        self.btn_retry_failed.setMinimumWidth(95)
+        self.btn_retry_failed.setToolTip("自动检测目标目录已下载物件，勾选未下载或失败的项目并开始下载")
+        self.btn_retry_failed.clicked.connect(self._retry_failed_items)
+        ctl_h.addWidget(self.btn_retry_failed)
+
         self.btn_cancel = QPushButton("取消")
         self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setMinimumWidth(65)
         self.btn_cancel.clicked.connect(self._cancel_download)
         ctl_h.addWidget(self.btn_cancel)
 
@@ -601,6 +663,25 @@ class MediaDownloaderWidget(QWidget):
             elif self.combo_quality.count() > 0:
                 self.combo_quality.setCurrentIndex(0)
 
+        # 同步动态更新单项微调画质下拉选项
+        if hasattr(self, "combo_item_quality"):
+            cur_item_data = self.combo_item_quality.currentData()
+            self.combo_item_quality.blockSignals(True)
+            self.combo_item_quality.clear()
+            self.combo_item_quality.addItem("遵循全局画质 (默认)", None)
+            for q_item in qualities:
+                qn = q_item.get("qn")
+                name = q_item.get("name", QUALITY_MAP.get(qn, f"{qn}P"))
+                if qn in VIP_QN_SET and "[大会员]" not in name:
+                    name = f"{name} [大会员]"
+                self.combo_item_quality.addItem(name, qn)
+            idx_item = self.combo_item_quality.findData(cur_item_data)
+            if idx_item >= 0:
+                self.combo_item_quality.setCurrentIndex(idx_item)
+            else:
+                self.combo_item_quality.setCurrentIndex(0)
+            self.combo_item_quality.blockSignals(False)
+
     def cleanup(self):
         for w in (self.account_worker, self.browser_worker, self.parse_worker, self.worker):
             if w and w.isRunning():
@@ -691,6 +772,8 @@ class MediaDownloaderWidget(QWidget):
 
     def _on_list_item_selection_changed(self, current, previous):
         if not current:
+            self.combo_item_quality.setEnabled(False)
+            self.btn_apply_quality_to_checked.setEnabled(False)
             return
         data = current.data(Qt.UserRole)
         if isinstance(data, dict):
@@ -704,6 +787,235 @@ class MediaDownloaderWidget(QWidget):
                 self.lbl_title.setText(f"标题: {data['title']}")
             if data.get("owner"):
                 self.lbl_up.setText(f"UP主: {data['owner']}")
+
+            # 同步画质单选下拉框
+            can_tune = not self.cb_audio_only.isChecked()
+            self.combo_item_quality.setEnabled(can_tune)
+            self.btn_apply_quality_to_checked.setEnabled(can_tune)
+            custom_qn = data.get("qn")
+            self.combo_item_quality.blockSignals(True)
+            idx = self.combo_item_quality.findData(custom_qn)
+            if idx >= 0:
+                self.combo_item_quality.setCurrentIndex(idx)
+            else:
+                self.combo_item_quality.setCurrentIndex(0)
+            self.combo_item_quality.blockSignals(False)
+
+    def _on_item_quality_combo_changed(self, index: int):
+        current = self.list_pages.currentItem()
+        if not current:
+            return
+        data = current.data(Qt.UserRole)
+        if not isinstance(data, dict):
+            return
+        selected_qn = self.combo_item_quality.currentData()
+        data["qn"] = selected_qn
+        current.setData(Qt.UserRole, data)
+        self._update_list_item_display(current)
+        qn_desc = QUALITY_MAP.get(selected_qn, f"{selected_qn}P") if selected_qn else "遵循全局画质"
+        self.txt_log.append(f"[画质微调] 《{data.get('part') or data.get('title')}》 指定画质: {qn_desc}")
+
+    def _apply_quality_to_checked(self):
+        selected_qn = self.combo_item_quality.currentData()
+        qn_desc = QUALITY_MAP.get(selected_qn, f"{selected_qn}P") if selected_qn else "遵循全局画质"
+        count = 0
+        for i in range(self.list_pages.count()):
+            item = self.list_pages.item(i)
+            if item.checkState() == Qt.Checked:
+                data = item.data(Qt.UserRole)
+                if isinstance(data, dict):
+                    data["qn"] = selected_qn
+                    item.setData(Qt.UserRole, data)
+                    self._update_list_item_display(item)
+                    count += 1
+        self.txt_log.append(f"[画质批量设置] 已将 {count} 项已勾选视频/分P画质设为: {qn_desc}")
+        QMessageBox.information(self, "设置完成", f"已成功将 {count} 项已勾选视频/分P的目标画质设为: {qn_desc}")
+
+    def _show_list_context_menu(self, pos):
+        item = self.list_pages.itemAt(pos)
+        if not item:
+            return
+        data = item.data(Qt.UserRole)
+        if not isinstance(data, dict):
+            return
+
+        menu = QMenu(self)
+        quality_menu = menu.addMenu("修改此项画质")
+        cur_qn = data.get("qn")
+
+        def _make_qn_handler(qn):
+            def _handler():
+                data["qn"] = qn
+                item.setData(Qt.UserRole, data)
+                self._update_list_item_display(item)
+                if self.list_pages.currentItem() == item:
+                    self.combo_item_quality.blockSignals(True)
+                    idx = self.combo_item_quality.findData(qn)
+                    if idx >= 0:
+                        self.combo_item_quality.setCurrentIndex(idx)
+                    self.combo_item_quality.blockSignals(False)
+                qn_desc = QUALITY_MAP.get(qn, f"{qn}P") if qn else "遵循全局画质"
+                self.txt_log.append(f"[画质设置] 已将 《{data.get('part') or data.get('title')}》 目标画质设为: {qn_desc}")
+            return _handler
+
+        act_def = quality_menu.addAction("遵循全局画质 (默认)")
+        act_def.setCheckable(True)
+        act_def.setChecked(cur_qn is None)
+        act_def.triggered.connect(_make_qn_handler(None))
+        quality_menu.addSeparator()
+
+        for qn_val in (127, 120, 116, 80, 64, 32, 16):
+            q_name = QUALITY_MAP.get(qn_val, f"{qn_val}P")
+            if qn_val in VIP_QN_SET:
+                q_name = f"{q_name} [大会员]"
+            act = quality_menu.addAction(q_name)
+            act.setCheckable(True)
+            act.setChecked(cur_qn == qn_val)
+            act.triggered.connect(_make_qn_handler(qn_val))
+
+        menu.addSeparator()
+
+        act_chk = menu.addAction("勾选此项")
+        act_chk.triggered.connect(lambda: item.setCheckState(Qt.Checked))
+        act_unchk = menu.addAction("取消勾选此项")
+        act_unchk.triggered.connect(lambda: item.setCheckState(Qt.Unchecked))
+
+        saved_path = data.get("saved_path")
+        if saved_path and os.path.isfile(saved_path):
+            menu.addSeparator()
+            act_loc = menu.addAction("在资源管理器中定位已下载文件")
+            def _open_loc():
+                import subprocess
+                subprocess.run(["explorer", f"/select,{os.path.normpath(saved_path)}"])
+            act_loc.triggered.connect(_open_loc)
+
+        menu.exec(self.list_pages.mapToGlobal(pos))
+
+    def _update_list_item_display(self, item: QListWidgetItem):
+        if not item:
+            return
+        data = item.data(Qt.UserRole)
+        if not isinstance(data, dict):
+            return
+        base_text = data.get("display_title")
+        if not base_text:
+            raw = item.text()
+            for pfx in ("[已下载] ", "[失败] ", "[下载中] "):
+                if raw.startswith(pfx):
+                    raw = raw[len(pfx):]
+            if " [画质: " in raw and raw.endswith("]"):
+                raw = raw.split(" [画质: ")[0]
+            base_text = raw
+            data["display_title"] = base_text
+        status = data.get("status", "pending")
+        custom_qn = data.get("qn")
+
+        qn_suffix = ""
+        if custom_qn:
+            q_name = QUALITY_MAP.get(custom_qn, f"{custom_qn}P")
+            qn_suffix = f" [画质: {q_name}]"
+
+        if status == "downloaded":
+            status_prefix = "[已下载] "
+            item.setForeground(QColor("#10b981"))
+        elif status == "failed":
+            status_prefix = "[失败] "
+            item.setForeground(QColor("#ef4444"))
+        elif status == "downloading":
+            status_prefix = "[下载中] "
+            item.setForeground(QColor("#3b82f6"))
+        else:
+            status_prefix = ""
+            item.setForeground(QColor("#1e293b"))
+
+        item.setText(f"{status_prefix}{base_text}{qn_suffix}")
+        if data.get("saved_path"):
+            item.setToolTip(f"已下载完成: {data['saved_path']}")
+        elif data.get("error"):
+            item.setToolTip(f"下载失败原因: {data['error']}")
+        else:
+            item.setToolTip("")
+
+    def _detect_downloaded_items(self, auto_uncheck: bool = True) -> tuple:
+        save_dir = self.le_save_dir.text().strip()
+        audio_only = self.cb_audio_only.isChecked()
+        audio_fmt = self.combo_audio_format.currentText().lower()
+        total = self.list_pages.count()
+        if total == 0:
+            return 0, 0
+        downloaded_cnt = 0
+
+        self.list_pages.blockSignals(True)
+        for i in range(total):
+            item = self.list_pages.item(i)
+            data = item.data(Qt.UserRole)
+            if isinstance(data, dict):
+                is_done, path = check_item_downloaded(data, save_dir, audio_only, audio_fmt)
+                if is_done:
+                    downloaded_cnt += 1
+                    data["status"] = "downloaded"
+                    data["saved_path"] = path
+                    if auto_uncheck:
+                        item.setCheckState(Qt.Unchecked)
+                else:
+                    if data.get("status") != "failed":
+                        data["status"] = "pending"
+                item.setData(Qt.UserRole, data)
+                self._update_list_item_display(item)
+        self.list_pages.blockSignals(False)
+        self._update_selection_count_label()
+        return downloaded_cnt, total
+
+    def _detect_downloaded_items_manual(self):
+        if self.list_pages.count() == 0:
+            QMessageBox.information(self, "提示", "请先解析视频或资源列表。")
+            return
+        dl_cnt, total = self._detect_downloaded_items(auto_uncheck=True)
+        self.txt_log.append(f"[检测已下载] 目录检测完成: 共 {total} 项，其中 {dl_cnt} 项已下载，{total - dl_cnt} 项未下载。")
+        QMessageBox.information(
+            self,
+            "检测已下载结果",
+            f"目标保存目录检测完成！\n\n已下载完整文件: {dl_cnt} 项 (已自动取消勾选)\n未下载/待下载: {total - dl_cnt} 项\n保存路径: {self.le_save_dir.text()}"
+        )
+
+    def _retry_failed_items(self):
+        if self.list_pages.count() == 0:
+            QMessageBox.information(self, "提示", "请先解析视频或资源列表。")
+            return
+
+        self._detect_downloaded_items(auto_uncheck=True)
+        checked_cnt = 0
+        self.list_pages.blockSignals(True)
+        for i in range(self.list_pages.count()):
+            item = self.list_pages.item(i)
+            data = item.data(Qt.UserRole)
+            if isinstance(data, dict):
+                if data.get("status") != "downloaded":
+                    item.setCheckState(Qt.Checked)
+                    checked_cnt += 1
+                else:
+                    item.setCheckState(Qt.Unchecked)
+        self.list_pages.blockSignals(False)
+        self._update_selection_count_label()
+
+        if checked_cnt == 0:
+            QMessageBox.information(self, "无需重试", "经检测，列表内所有视频均已成功下载，无未完成项！")
+            return
+
+        self.txt_log.append(f"[重试未下载] 已自动勾选 {checked_cnt} 项未下载或失败的项目，开始重试下载...")
+        self._start_download()
+
+    def _toggle_pause_resume(self):
+        if not self.worker or not self.worker.isRunning():
+            return
+        if getattr(self.worker, "_is_paused", False):
+            self.worker.resume()
+            self.btn_pause_resume.setText("暂停")
+            self.txt_log.append("[操作] 用户恢复了下载任务。")
+        else:
+            self.worker.pause()
+            self.btn_pause_resume.setText("继续")
+            self.txt_log.append("[操作] 用户暂停了下载任务。")
 
     def _parse_video(self):
         raw_text = self.le_url.text().strip()
@@ -793,7 +1105,10 @@ class MediaDownloaderWidget(QWidget):
                     "part": "",
                     "page": v.get("page", 1),
                     "pic": v.get("pic", ""),
-                    "owner": v.get("owner", owner)
+                    "owner": v.get("owner", owner),
+                    "display_title": item_text,
+                    "qn": None,
+                    "status": "pending"
                 })
                 self.list_pages.addItem(item)
         else:
@@ -812,11 +1127,17 @@ class MediaDownloaderWidget(QWidget):
                     "part": p.get("part", f"P{p['page']}"),
                     "page": p.get("page", 1),
                     "pic": info.get("pic", ""),
-                    "owner": owner
+                    "owner": owner,
+                    "display_title": item_text,
+                    "qn": None,
+                    "status": "pending"
                 })
                 self.list_pages.addItem(item)
 
         self.list_pages.blockSignals(False)
+
+        # 自动检测本地已下载文件并更新标识
+        self._detect_downloaded_items(auto_uncheck=True)
 
         if self.list_pages.count() > 0:
             self.list_pages.setCurrentRow(0)
@@ -847,14 +1168,19 @@ class MediaDownloaderWidget(QWidget):
             if it.checkState() == Qt.Checked:
                 data = it.data(Qt.UserRole)
                 if isinstance(data, dict):
-                    checked_tasks.append(data)
+                    task_item = dict(data)
+                    task_item["list_index"] = i
+                    checked_tasks.append(task_item)
                 else:
                     checked_tasks.append({
                         "bvid": self.current_video_info.get("bvid", ""),
                         "cid": data,
                         "title": self.current_video_info.get("title", ""),
                         "part": it.text(),
-                        "page": i + 1
+                        "page": i + 1,
+                        "qn": None,
+                        "status": "pending",
+                        "list_index": i
                     })
 
         if not checked_tasks:
@@ -865,44 +1191,47 @@ class MediaDownloaderWidget(QWidget):
         audio_only = self.cb_audio_only.isChecked()
         audio_fmt = self.combo_audio_format.currentText().lower()
         save_dir = self.le_save_dir.text().strip()
+        skip_existing = self.cb_skip_existing.isChecked()
 
         # 确保最新凭据已同步
         self.api.set_cookie(self._get_normalized_cookie())
 
         # 会员画质预先提示
-        is_target_vip = target_qn in VIP_QN_SET
+        is_target_vip = target_qn in VIP_QN_SET or any(t.get("qn") in VIP_QN_SET for t in checked_tasks if t.get("qn"))
         is_account_vip = bool(self.account_status and self.account_status.get("vip_status") == 1 and self.account_status.get("vip_type", 0) > 0)
         if is_target_vip and not is_account_vip and not audio_only:
             target_qname = self.combo_quality.currentText()
             reply = QMessageBox.question(
                 self,
                 "清晰度提示",
-                f"目标清晰度 [{target_qname}] 需要大会员权限，当前账号未开通大会员，服务端将自动降级为可用的最高画质。\n\n是否继续批量下载选中的 {len(checked_tasks)} 项任务？",
+                f"目标清晰度包含大会员画质，当前账号未开通大会员，服务端将自动降级为可用的最高画质。\n\n是否继续下载选中的 {len(checked_tasks)} 项任务？",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
             )
             if reply != QMessageBox.Yes:
-                self.txt_log.append("[已取消] 用户取消了批量下载任务。")
+                self.txt_log.append("[已取消] 用户取消了下载任务。")
                 return
 
         self.btn_download.setEnabled(False)
         self.btn_cancel.setEnabled(True)
+        self.btn_pause_resume.setEnabled(True)
+        self.btn_pause_resume.setText("暂停")
+        self.btn_retry_failed.setEnabled(False)
         self.progress_bar.setValue(0)
 
         # 单个任务且已具备流地址时走快速单任务
-        if len(checked_tasks) == 1 and self.current_video_info.get("type") not in ("favorite", "space") and self.current_video_info.get("stream_res") and checked_tasks[0].get("cid") == (self.current_video_info.get("pages", [{}])[0].get("cid")):
+        if len(checked_tasks) == 1 and self.current_video_info.get("type") not in ("favorite", "space"):
             task = checked_tasks[0]
-            stream_res = self.current_video_info["stream_res"]
-            if not audio_only and target_qn != stream_res.get("actual_qn"):
-                try:
-                    refreshed = self.api.get_play_streams(task.get("bvid", ""), task.get("cid"), qn=target_qn)
-                    if refreshed.get("success"):
-                        stream_res = refreshed
-                        self.current_video_info["stream_res"] = refreshed
-                    else:
-                        self.txt_log.append(f"[警告] 重新获取画质(qn={target_qn})失败，将使用初始流: {refreshed.get('error', '未知错误')}")
-                except Exception as e:
-                    self.txt_log.append(f"[警告] 重新获取画质(qn={target_qn})异常: {e}，将使用初始流")
+            self._current_single_task = task
+            task_qn = task.get("qn") or target_qn
+
+            if skip_existing:
+                is_done, existing_p = check_item_downloaded(task, save_dir, audio_only, audio_fmt)
+                if is_done:
+                    self.txt_log.append(f"[已存在] 目标文件已存在，跳过下载: {existing_p}")
+                    self.progress_bar.setValue(100)
+                    self._on_download_finished(True, existing_p)
+                    return
 
             title = str(task.get("title") or "video")
             part = str(task.get("part") or "")
@@ -913,20 +1242,44 @@ class MediaDownloaderWidget(QWidget):
             else:
                 full_title = f"{title}_{part}"
 
+            stream_res = None
+            if self.current_video_info.get("stream_res") and task.get("cid") == (self.current_video_info.get("pages", [{}])[0].get("cid")):
+                stream_res = self.current_video_info["stream_res"]
+
+            if not stream_res or (not audio_only and task_qn != stream_res.get("actual_qn")):
+                try:
+                    refreshed = self.api.get_play_streams(task.get("bvid", ""), task.get("cid"), qn=task_qn)
+                    if refreshed.get("success"):
+                        stream_res = refreshed
+                        if self.current_video_info and (not self.current_video_info.get("pages") or task.get("cid") == (self.current_video_info.get("pages", [{}])[0].get("cid"))):
+                            self.current_video_info["stream_res"] = refreshed
+                    else:
+                        self.txt_log.append(f"[警告] 获取指定画质(qn={task_qn})失败: {refreshed.get('error', '未知错误')}")
+                except Exception as e:
+                    self.txt_log.append(f"[警告] 获取指定画质(qn={task_qn})异常: {e}")
+
+            if not stream_res or not stream_res.get("success"):
+                err_msg = stream_res.get("error", "获取播放流失败") if stream_res else "获取播放流失败"
+                self.txt_log.append(f"[错误] {err_msg}")
+                self._on_download_finished(False, err_msg)
+                return
+
             self.worker = MediaDownloadWorker(
                 video_url=stream_res.get("video_url", ""),
                 audio_url=stream_res.get("audio_url", ""),
                 save_dir=save_dir,
                 title=full_title,
                 audio_only=audio_only,
-                audio_format=audio_fmt,
+                audio_format=task.get("audio_format") or audio_fmt,
                 cookie=self.api.cookie
             )
             self.worker.progress_changed.connect(self._on_download_progress)
             self.worker.log_message.connect(self.txt_log.append)
+            self.worker.paused_status.connect(self._on_worker_paused_status_changed)
             self.worker.finished_task.connect(self._on_download_finished)
             self.worker.start()
         else:
+            self._current_single_task = None
             # 批量执行引擎
             self.worker = BatchMediaDownloadWorker(
                 api=self.api,
@@ -935,10 +1288,13 @@ class MediaDownloaderWidget(QWidget):
                 target_qn=target_qn,
                 audio_only=audio_only,
                 audio_format=audio_fmt,
-                cookie=self.api.cookie
+                cookie=self.api.cookie,
+                skip_existing=skip_existing
             )
             self.worker.progress_changed.connect(self._on_download_progress)
             self.worker.log_message.connect(self.txt_log.append)
+            self.worker.paused_status.connect(self._on_worker_paused_status_changed)
+            self.worker.item_finished.connect(self._on_item_finished)
             self.worker.batch_finished.connect(self._on_batch_download_finished)
             self.worker.start()
 
@@ -946,6 +1302,10 @@ class MediaDownloaderWidget(QWidget):
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
             self.btn_cancel.setEnabled(False)
+            self.btn_pause_resume.setEnabled(False)
+            self.btn_pause_resume.setText("暂停")
+            self.btn_download.setEnabled(True)
+            self.btn_retry_failed.setEnabled(True)
             self.txt_log.append("[已取消] 正在终止当前下载任务...")
 
     def _on_download_progress(self, pct: int, msg: str):
@@ -955,14 +1315,99 @@ class MediaDownloaderWidget(QWidget):
     def _on_download_finished(self, success: bool, res_msg: str):
         self.btn_download.setEnabled(True)
         self.btn_cancel.setEnabled(False)
+        self.btn_pause_resume.setEnabled(False)
+        self.btn_pause_resume.setText("暂停")
+
+        # 更新单任务对应的列表项状态
+        if hasattr(self, "_current_single_task") and self._current_single_task:
+            task = self._current_single_task
+            target_item = None
+            row_idx = task.get("list_index")
+            if row_idx is not None and 0 <= row_idx < self.list_pages.count():
+                target_item = self.list_pages.item(row_idx)
+            if not target_item:
+                for i in range(self.list_pages.count()):
+                    it = self.list_pages.item(i)
+                    c_data = it.data(Qt.UserRole)
+                    if isinstance(c_data, dict) and task.get("cid") and c_data.get("cid") == task.get("cid"):
+                        target_item = it
+                        break
+            if target_item:
+                data = target_item.data(Qt.UserRole)
+                if isinstance(data, dict):
+                    if success:
+                        data["status"] = "downloaded"
+                        data["saved_path"] = res_msg
+                        data.pop("error", None)
+                        target_item.setCheckState(Qt.Unchecked)
+                    else:
+                        data["status"] = "failed"
+                        data["error"] = res_msg
+                        target_item.setCheckState(Qt.Checked)
+                    target_item.setData(Qt.UserRole, data)
+                    self._update_list_item_display(target_item)
+                    self._update_selection_count_label()
+            self._current_single_task = None
+
         if success:
             QMessageBox.information(self, "下载完成", f"已成功下载至:\n{res_msg}")
         else:
-            QMessageBox.warning(self, "下载提示", f"任务未完成: {res_msg}")
+            self.btn_retry_failed.setEnabled(True)
+            QMessageBox.warning(self, "下载提示", f"任务未完成: {res_msg}\n您可以点击【重试未下载】重新下载。")
+
+    def _on_item_finished(self, idx: int, total: int, ok: bool, res: str):
+        target_item = None
+        task = None
+        if self.worker and hasattr(self.worker, "tasks") and isinstance(self.worker.tasks, list):
+            if 0 <= idx - 1 < len(self.worker.tasks):
+                task = self.worker.tasks[idx - 1]
+
+        if task and isinstance(task, dict):
+            row_idx = task.get("list_index")
+            if row_idx is not None and 0 <= row_idx < self.list_pages.count():
+                candidate = self.list_pages.item(row_idx)
+                c_data = candidate.data(Qt.UserRole)
+                if isinstance(c_data, dict) and (c_data.get("cid") == task.get("cid") or c_data.get("part") == task.get("part")):
+                    target_item = candidate
+
+            if not target_item:
+                for i in range(self.list_pages.count()):
+                    candidate = self.list_pages.item(i)
+                    c_data = candidate.data(Qt.UserRole)
+                    if isinstance(c_data, dict):
+                        if task.get("cid") and c_data.get("cid") == task.get("cid"):
+                            target_item = candidate
+                            break
+                        if task.get("page") and c_data.get("page") == task.get("page") and c_data.get("bvid") == task.get("bvid"):
+                            target_item = candidate
+                            break
+
+        if not target_item and 1 <= idx <= self.list_pages.count():
+            target_item = self.list_pages.item(idx - 1)
+
+        if target_item:
+            data = target_item.data(Qt.UserRole)
+            if isinstance(data, dict):
+                if ok:
+                    data["status"] = "downloaded"
+                    data["saved_path"] = res
+                    data.pop("error", None)
+                    target_item.setCheckState(Qt.Unchecked)
+                else:
+                    data["status"] = "failed"
+                    data["error"] = res
+                    target_item.setCheckState(Qt.Checked)
+                    self.btn_retry_failed.setEnabled(True)
+                target_item.setData(Qt.UserRole, data)
+                self._update_list_item_display(target_item)
+                self._update_selection_count_label()
 
     def _on_batch_download_finished(self, success_cnt: int, fail_cnt: int, saved_paths: list):
         self.btn_download.setEnabled(True)
         self.btn_cancel.setEnabled(False)
+        self.btn_pause_resume.setEnabled(False)
+        self.btn_pause_resume.setText("暂停")
+        self._detect_downloaded_items(auto_uncheck=True)
         if fail_cnt == 0:
             QMessageBox.information(
                 self,
@@ -970,8 +1415,14 @@ class MediaDownloaderWidget(QWidget):
                 f"已全部下载完成！共成功下载 {success_cnt} 项。\n保存文件夹:\n{self.le_save_dir.text()}"
             )
         else:
+            self.btn_retry_failed.setEnabled(True)
+            self.txt_log.append(f"[提示] 检测到有 {fail_cnt} 项未完成/失败，可点击【重试未下载】按钮进行快速断点重试。")
             QMessageBox.warning(
                 self,
                 "批量下载提示",
-                f"批量任务结束。\n成功: {success_cnt} 项\n失败: {fail_cnt} 项\n保存文件夹:\n{self.le_save_dir.text()}"
+                f"批量任务结束。\n成功: {success_cnt} 项\n失败: {fail_cnt} 项\n\n已自动为您勾选未完成/失败项，可直接点击【重试未下载】重新下载。"
             )
+
+    def _on_worker_paused_status_changed(self, is_paused: bool):
+        self.btn_pause_resume.setText("继续" if is_paused else "暂停")
+

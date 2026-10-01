@@ -7,19 +7,57 @@ import re
 import shutil
 import subprocess
 import time
+import threading
 import requests
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple, List, Dict
 from PySide6.QtCore import QThread, Signal
-from .api import HEADERS, normalize_cookie
+from .api import HEADERS, normalize_cookie, QUALITY_MAP
 
 
 from toolbox.core.paths import find_ffmpeg_executable, sanitize_filename
+
+
+def get_task_target_filename(task: dict, audio_only: bool = False, audio_format: str = "mp3") -> str:
+    """计算单个下载任务对应的最终目标文件名"""
+    title = str(task.get("title") or "video")
+    part = str(task.get("part") or "")
+    if not part or part == title or part in title:
+        full_title = title
+    elif title in part:
+        full_title = part
+    else:
+        full_title = f"{title}_{part}"
+    clean_title = sanitize_filename(full_title)
+    if audio_only:
+        fmt = (task.get("audio_format") or audio_format or "mp3").lower().strip()
+        if fmt not in ("mp3", "m4a", "wav", "flac", "aac", "ogg"):
+            fmt = "mp3"
+        return f"{clean_title}.{fmt}"
+    else:
+        return f"{clean_title}.mp4"
+
+
+def check_item_downloaded(task: dict, save_dir: str, audio_only: bool = False, audio_format: str = "mp3") -> Tuple[bool, str]:
+    """检测指定任务在目标目录中是否已存在且完整 (> 1KB)"""
+    if not save_dir or not os.path.isdir(save_dir):
+        return False, ""
+    filename = get_task_target_filename(task, audio_only=audio_only, audio_format=audio_format)
+    target_path = os.path.join(save_dir, filename)
+    if os.path.isfile(target_path) and os.path.getsize(target_path) > 1024:
+        return True, target_path
+    if not audio_only:
+        alt_name = os.path.splitext(filename)[0] + "_video.mp4"
+        alt_path = os.path.join(save_dir, alt_name)
+        if os.path.isfile(alt_path) and os.path.getsize(alt_path) > 1024:
+            return True, alt_path
+    return False, target_path
 
 
 class MediaDownloadWorker(QThread):
     progress_changed = Signal(int, str)  # (百分比, 状态描述)
     log_message = Signal(str)            # 日志信息
     finished_task = Signal(bool, str)    # (成功布尔值, 最终保存路径或错误原因)
+    paused_status = Signal(bool)          # 是否处于暂停状态
 
     def __init__(
         self,
@@ -44,11 +82,34 @@ class MediaDownloadWorker(QThread):
         self.cookie = normalize_cookie(cookie) if cookie else ""
         self.custom_headers = headers or {}
         self._is_cancelled = False
+        self._is_paused = False
+        self._pause_event = threading.Event()
+        self._pause_event.set()
+        self._last_pct = 0
+        self._last_status = ""
         self._proc: Optional[subprocess.Popen] = None
         self._current_resp: Optional[requests.Response] = None
 
+    def pause(self):
+        if not self._is_paused and not self._is_cancelled:
+            self._is_paused = True
+            self._pause_event.clear()
+            self.paused_status.emit(True)
+            self.log_message.emit("[暂停] 下载已暂停。")
+            self.progress_changed.emit(self._last_pct, "下载已暂停 (点击继续恢复)")
+
+    def resume(self):
+        if self._is_paused and not self._is_cancelled:
+            self._is_paused = False
+            self._pause_event.set()
+            self.paused_status.emit(False)
+            self.log_message.emit("[继续] 正在恢复下载...")
+            self.progress_changed.emit(self._last_pct, self._last_status or "正在恢复下载...")
+
     def cancel(self):
         self._is_cancelled = True
+        self._is_paused = False
+        self._pause_event.set()
         if self._proc and self._proc.poll() is None:
             try:
                 self._proc.terminate()
@@ -70,9 +131,8 @@ class MediaDownloadWorker(QThread):
             self.finished_task.emit(False, f"创建保存目录失败: {e}")
             return
 
-        timestamp = int(time.time())
-        v_temp = os.path.join(self.save_dir, f"temp_v_{timestamp}.m4s")
-        a_temp = os.path.join(self.save_dir, f"temp_a_{timestamp}.m4s")
+        v_temp = os.path.join(self.save_dir, f".part_{self.title}_v.m4s")
+        a_temp = os.path.join(self.save_dir, f".part_{self.title}_a.m4s")
         download_success = False
 
         try:
@@ -257,7 +317,7 @@ class MediaDownloadWorker(QThread):
             self.log_message.emit(f"[错误] 下载或合并发生异常: {e}")
             self.finished_task.emit(False, str(e))
         finally:
-            if not download_success:
+            if not download_success and self._is_cancelled:
                 for p in (v_temp, a_temp):
                     if os.path.exists(p):
                         try:
@@ -266,12 +326,18 @@ class MediaDownloadWorker(QThread):
                             pass
 
     def _download_stream(self, url: str, save_path: str, label: str, weight: float = 0.5, offset: float = 0.0) -> bool:
-        max_retries = 3
+        max_retries = 5
         downloaded = 0
+        if os.path.exists(save_path):
+            downloaded = os.path.getsize(save_path)
         total_size = 0
         start_time = time.time()
+        last_speed_time = start_time
+        last_downloaded = downloaded
 
         for attempt in range(max_retries):
+            while self._is_paused and not self._is_cancelled:
+                self._pause_event.wait(timeout=0.2)
             if self._is_cancelled:
                 self.log_message.emit(f"[已取消] 用户已取消 {label} 下载。")
                 self.finished_task.emit(False, "已取消")
@@ -290,14 +356,32 @@ class MediaDownloadWorker(QThread):
                 self._current_resp = resp
                 try:
                     if hasattr(resp, "raise_for_status"):
+                        if resp.status_code == 416 and downloaded > 0:
+                            return True
                         resp.raise_for_status()
 
-                    if downloaded == 0:
-                        total_size = int(resp.headers.get("content-length", 0))
+                    # 若发送了 Range 请求但服务端未按 206 返回而是返回 200 全量流，需从头覆盖写入防破坏
+                    if downloaded > 0 and resp.status_code == 200:
+                        downloaded = 0
+
+                    content_length = int(resp.headers.get("content-length", 0))
+                    if downloaded > 0:
+                        content_range = resp.headers.get("content-range", "")
+                        if content_range and "/" in content_range:
+                            try:
+                                total_size = int(content_range.split("/")[-1])
+                            except Exception:
+                                total_size = downloaded + content_length
+                        else:
+                            total_size = downloaded + content_length
+                    else:
+                        total_size = content_length
 
                     mode = "ab" if downloaded > 0 else "wb"
                     with open(save_path, mode) as f:
                         for chunk in resp.iter_content(chunk_size=1024 * 128):
+                            while self._is_paused and not self._is_cancelled:
+                                self._pause_event.wait(timeout=0.2)
                             if self._is_cancelled:
                                 self.log_message.emit(f"[已取消] 用户已取消 {label} 下载。")
                                 self.finished_task.emit(False, "已取消")
@@ -306,20 +390,39 @@ class MediaDownloadWorker(QThread):
                             if chunk:
                                 f.write(chunk)
                                 downloaded += len(chunk)
-                                elapsed = max(0.1, time.time() - start_time)
-                                speed_kb = (downloaded / 1024) / elapsed
+                                now = time.time()
+                                dt = now - last_speed_time
+                                if dt >= 0.5:
+                                    speed_kb = ((downloaded - last_downloaded) / 1024) / max(0.01, dt)
+                                    last_speed_time = now
+                                    last_downloaded = downloaded
 
-                                pct = int(offset + (downloaded / total_size * 100 * weight)) if total_size > 0 else 0
-                                self.progress_changed.emit(min(90, pct), f"正在下载{label}... {speed_kb:.1f} KB/s")
+                                    pct = int(offset + (downloaded / total_size * 100 * weight)) if total_size > 0 else 0
+                                    self._last_pct = min(90, pct)
+                                    self._last_status = f"正在下载{label}... {speed_kb:.1f} KB/s"
+                                    if not self._is_paused:
+                                        self.progress_changed.emit(self._last_pct, self._last_status)
 
                     if total_size == 0 or downloaded >= total_size:
                         return True
                 finally:
                     self._current_resp = None
             except Exception as e:
+                had_pause = self._is_paused
+                while self._is_paused and not self._is_cancelled:
+                    self._pause_event.wait(timeout=0.2)
                 if self._is_cancelled:
                     self.finished_task.emit(False, "已取消")
                     return False
+
+                if downloaded > 0 and total_size > 0 and downloaded >= total_size:
+                    return True
+
+                if had_pause:
+                    # 暂停期间连接超时或断开，恢复后无损发起断点续传请求，不消耗网络故障重试次数
+                    self.log_message.emit(f"[{label}] 暂停已恢复，正在重新建立长连接断点续传...")
+                    continue
+
                 self.log_message.emit(f"[{label}] 网络连接波动 ({e})，正在自动断点续传重试 ({attempt + 1}/{max_retries})...")
                 time.sleep(1)
                 if attempt == max_retries - 1:
@@ -338,6 +441,7 @@ class BatchMediaDownloadWorker(QThread):
     log_message = Signal(str)                     # 日志信息
     item_finished = Signal(int, int, bool, str)   # (当前序号, 总任务数, 是否成功, 保存路径或错误)
     batch_finished = Signal(int, int, list)       # (成功总数, 失败总数, 成功保存的路径列表)
+    paused_status = Signal(bool)                  # 暂停状态信号
 
     def __init__(
         self,
@@ -348,7 +452,8 @@ class BatchMediaDownloadWorker(QThread):
         audio_only: bool = False,
         audio_format: str = "mp3",
         ffmpeg_path: Optional[str] = None,
-        cookie: Optional[str] = None
+        cookie: Optional[str] = None,
+        skip_existing: bool = True
     ):
         super().__init__()
         self.api = api
@@ -359,11 +464,31 @@ class BatchMediaDownloadWorker(QThread):
         self.audio_format = (audio_format or "mp3").lower().strip()
         self.ffmpeg_path = ffmpeg_path or find_ffmpeg_executable()
         self.cookie = normalize_cookie(cookie) if cookie else ""
+        self.skip_existing = skip_existing
         self._is_cancelled = False
+        self._is_paused = False
+        self._pause_event = threading.Event()
+        self._pause_event.set()
         self._current_worker: Optional[MediaDownloadWorker] = None
+
+    def pause(self):
+        self._is_paused = True
+        self._pause_event.clear()
+        self.paused_status.emit(True)
+        if self._current_worker:
+            self._current_worker.pause()
+
+    def resume(self):
+        self._is_paused = False
+        self._pause_event.set()
+        self.paused_status.emit(False)
+        if self._current_worker:
+            self._current_worker.resume()
 
     def cancel(self):
         self._is_cancelled = True
+        self._is_paused = False
+        self._pause_event.set()
         if self._current_worker:
             self._current_worker.cancel()
 
@@ -380,6 +505,8 @@ class BatchMediaDownloadWorker(QThread):
         self.log_message.emit(f"[批量任务] 启动批量下载队列，共 {total} 项待下载任务...")
 
         for idx, task in enumerate(self.tasks, 1):
+            while self._is_paused and not self._is_cancelled:
+                self._pause_event.wait(timeout=0.2)
             if self._is_cancelled:
                 self.log_message.emit("[批量任务] 用户已取消剩余批量任务。")
                 break
@@ -398,15 +525,35 @@ class BatchMediaDownloadWorker(QThread):
             else:
                 full_title = f"{title}_{part}"
 
+            task_qn = task.get("qn") or self.target_qn
+            task_audio_fmt = (task.get("audio_format") or self.audio_format or "mp3").lower().strip()
+
+            # 智能检测是否已存在已下载完整文件
+            if self.skip_existing:
+                is_done, existing_p = check_item_downloaded(task, self.save_dir, self.audio_only, task_audio_fmt)
+                if is_done:
+                    self.log_message.emit(f"[{idx}/{total}] [已存在] 《{full_title}》检测到已下载完整文件，自动跳过: {os.path.basename(existing_p)}")
+                    success_count += 1
+                    saved_paths.append(existing_p)
+                    self.item_finished.emit(idx, total, True, existing_p)
+                    base_pct = int((idx / total) * 100)
+                    self.progress_changed.emit(min(99, base_pct), f"[{idx}/{total}] 已存在，跳过")
+                    continue
+
             self.item_started.emit(idx, total, full_title)
-            self.log_message.emit(f"[{idx}/{total}] 准备下载: 《{full_title}》...")
+            qn_name = QUALITY_MAP.get(task_qn, f"{task_qn}P")
+            self.log_message.emit(f"[{idx}/{total}] 准备下载: 《{full_title}》 (指定画质: {qn_name})...")
 
             # 1. 如果没有 cid，调用 get_video_info 获取
             if not cid:
+                while self._is_paused and not self._is_cancelled:
+                    self._pause_event.wait(timeout=0.2)
                 if self._is_cancelled:
                     break
                 try:
                     info = self.api.get_video_info(bvid)
+                    while self._is_paused and not self._is_cancelled:
+                        self._pause_event.wait(timeout=0.2)
                     if self._is_cancelled:
                         break
                     if info.get("success") and info.get("pages"):
@@ -419,7 +566,7 @@ class BatchMediaDownloadWorker(QThread):
                         if not matched_page and info["pages"] and isinstance(info["pages"][0], dict):
                             matched_page = info["pages"][0]
                         cid = matched_page.get("cid") if isinstance(matched_page, dict) else None
-                    
+
                     if not cid:
                         if self._is_cancelled:
                             break
@@ -436,12 +583,16 @@ class BatchMediaDownloadWorker(QThread):
                     fail_count += 1
                     continue
 
+            while self._is_paused and not self._is_cancelled:
+                self._pause_event.wait(timeout=0.2)
             if self._is_cancelled:
                 break
 
-            # 2. 获取播放流
+            # 2. 获取播放流 (使用当前任务指定的画质 task_qn)
             try:
-                stream_res = self.api.get_play_streams(bvid, cid, qn=self.target_qn)
+                stream_res = self.api.get_play_streams(bvid, cid, qn=task_qn)
+                while self._is_paused and not self._is_cancelled:
+                    self._pause_event.wait(timeout=0.2)
                 if self._is_cancelled:
                     break
                 if not stream_res.get("success"):
@@ -470,7 +621,7 @@ class BatchMediaDownloadWorker(QThread):
                 save_dir=self.save_dir,
                 title=full_title,
                 audio_only=self.audio_only,
-                audio_format=self.audio_format,
+                audio_format=task_audio_fmt,
                 ffmpeg_path=self.ffmpeg_path,
                 cookie=self.cookie
             )
@@ -495,6 +646,8 @@ class BatchMediaDownloadWorker(QThread):
 
             try:
                 self._current_worker = worker
+                if self._is_paused:
+                    worker.pause()
                 worker.run()
             finally:
                 self._current_worker = None
@@ -516,4 +669,5 @@ class BatchMediaDownloadWorker(QThread):
         else:
             self.progress_changed.emit(100, f"批量任务完成 (成功: {success_count}，失败: {fail_count})")
         self.batch_finished.emit(success_count, fail_count, saved_paths)
+
 

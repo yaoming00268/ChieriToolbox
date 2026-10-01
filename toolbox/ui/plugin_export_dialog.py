@@ -91,7 +91,9 @@ class PluginExportDialog(QDialog):
         iscc_path = PluginExporter.find_iscc_executable()
         self.lbl_iscc_status = QLabel()
         if iscc_path:
-            self.lbl_iscc_status.setText(f"已检测到 Inno Setup 编译器: {iscc_path}")
+            is_embedded = "bin" in iscc_path.lower() and "innosetup" in iscc_path.lower()
+            tag = "已就绪项目内置 Inno Setup 编译器" if is_embedded else "已检测到系统 Inno Setup 编译器"
+            self.lbl_iscc_status.setText(f"{tag}: {iscc_path}")
             self.lbl_iscc_status.setStyleSheet("color: #10b981; font-size: 11px;")
         else:
             self.lbl_iscc_status.setText("未检测到 Inno Setup 编译器，将生成 .iss 脚本与一键编译批处理")

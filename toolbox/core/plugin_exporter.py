@@ -23,9 +23,13 @@ class PluginExporter:
     def find_iscc_executable() -> Optional[str]:
         """
         智能搜寻系统中的 Inno Setup 编译器可执行文件 (ISCC.exe)
-        支持自动探测 LocalAppData, ProgramFiles, ProgramFiles(x86), PATH 环境变量以及 Windows 注册表。
+        优先使用工程或应用内置的便携版编译器 (bin/InnoSetup/ISCC.exe)，
+        若未内置则自适应探测 LocalAppData, ProgramFiles, PATH 环境变量以及 Windows 注册表。
         """
         candidates = [
+            os.path.join(get_bin_dir(), "InnoSetup", "ISCC.exe"),
+            os.path.join(get_app_root(), "bin", "InnoSetup", "ISCC.exe"),
+            os.path.join(get_bundle_dir(), "bin", "InnoSetup", "ISCC.exe"),
             os.path.expandvars(r"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"),
             os.path.expandvars(r"%ProgramFiles%\Inno Setup 6\ISCC.exe"),
             os.path.expandvars(r"%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"),
@@ -33,10 +37,9 @@ class PluginExporter:
             os.path.expandvars(r"%ProgramFiles(x86)%\Inno Setup 5\ISCC.exe"),
             r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
             r"C:\Program Files\Inno Setup 6\ISCC.exe",
-            os.path.join(get_bin_dir(), "InnoSetup", "ISCC.exe"),
         ]
         for c in candidates:
-            if os.path.isfile(c):
+            if c and os.path.isfile(c):
                 return os.path.normpath(c)
 
         which_iscc = shutil.which("ISCC.exe") or shutil.which("iscc")
@@ -92,21 +95,23 @@ class PluginExporter:
         h = hashlib.md5(f"chieri_{plugin_id}".encode()).hexdigest().upper()
         app_guid = f"{{{{CHIERI-{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}}}}}"
 
+        norm_target = os.path.abspath(target_dir)
+        norm_output = os.path.abspath(output_dir)
+
         if not ico_path and hasattr(plugin, "get_ico_path"):
             cand_ico = plugin.get_ico_path()
             if cand_ico and os.path.isfile(cand_ico):
-                ico_path = cand_ico
+                ico_path = os.path.abspath(cand_ico)
         if not ico_path:
-            cand_ico = os.path.join(target_dir, "app_icon.ico")
+            cand_ico = os.path.join(norm_target, "app_icon.ico")
             if os.path.isfile(cand_ico):
-                ico_path = cand_ico
+                ico_path = os.path.abspath(cand_ico)
+        if ico_path:
+            ico_path = os.path.abspath(ico_path)
 
         icon_setup = f'SetupIconFile="{ico_path}"\n' if ico_path and os.path.isfile(ico_path) else ''
         icon_uninst = 'UninstallDisplayIcon="{app}\\app_icon.ico"\n' if ico_path and os.path.isfile(ico_path) else ''
         autostart_flag = 'Flags: unchecked' if not autostart_default else ''
-
-        norm_target = os.path.abspath(target_dir)
-        norm_output = os.path.abspath(output_dir)
 
         iss = f"""; ========================================================
 ; 千绘莉多功能工具箱 - 独立插件原生 Inno Setup 安装包工程脚本
@@ -180,9 +185,10 @@ Filename: "{{app}}\\launch.bat"; Description: "立即启动 {plugin_name}"; Flag
         if not plugin:
             return {"success": False, "error": f"未能找到插件 [{plugin_id}]"}
 
+        output_dir = os.path.abspath(output_dir)
         os.makedirs(output_dir, exist_ok=True)
         bundle_name = f"ChieriPlugin_{plugin_id}"
-        target_dir = os.path.join(output_dir, bundle_name)
+        target_dir = os.path.abspath(os.path.join(output_dir, bundle_name))
         if os.path.exists(target_dir):
             shutil.rmtree(target_dir, ignore_errors=True)
         os.makedirs(target_dir, exist_ok=True)
@@ -771,7 +777,10 @@ title 正在使用 Inno Setup 编译 {plugin.name} 原生 EXE 安装包...
 cd /d "%~dp0"
 
 set "ISCC_BIN="
-if exist "%LOCALAPPDATA%\\Programs\\Inno Setup 6\\ISCC.exe" set "ISCC_BIN=%LOCALAPPDATA%\\Programs\\Inno Setup 6\\ISCC.exe"
+if exist "%~dp0bin\\InnoSetup\\ISCC.exe" set "ISCC_BIN=%~dp0bin\\InnoSetup\\ISCC.exe"
+if not defined ISCC_BIN if exist "%~dp0..\\bin\\InnoSetup\\ISCC.exe" set "ISCC_BIN=%~dp0..\\bin\\InnoSetup\\ISCC.exe"
+if not defined ISCC_BIN if exist "%~dp0..\\..\\bin\\InnoSetup\\ISCC.exe" set "ISCC_BIN=%~dp0..\\..\\bin\\InnoSetup\\ISCC.exe"
+if not defined ISCC_BIN if exist "%LOCALAPPDATA%\\Programs\\Inno Setup 6\\ISCC.exe" set "ISCC_BIN=%LOCALAPPDATA%\\Programs\\Inno Setup 6\\ISCC.exe"
 if not defined ISCC_BIN if exist "%ProgramFiles%\\Inno Setup 6\\ISCC.exe" set "ISCC_BIN=%ProgramFiles%\\Inno Setup 6\\ISCC.exe"
 if not defined ISCC_BIN if exist "%ProgramFiles(x86)%\\Inno Setup 6\\ISCC.exe" set "ISCC_BIN=%ProgramFiles(x86)%\\Inno Setup 6\\ISCC.exe"
 if not defined ISCC_BIN (
