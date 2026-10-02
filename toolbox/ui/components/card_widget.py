@@ -5,7 +5,7 @@
 """
 
 from typing import Optional
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGraphicsDropShadowEffect
 )
@@ -28,6 +28,7 @@ class PluginCardWidget(QFrame):
         card_height: Optional[int] = None,
         parent=None
     ):
+        self._pending_visible = False
         super().__init__(parent)
         self.setWindowFlags(Qt.Widget)
         self.plugin = plugin
@@ -45,10 +46,19 @@ class PluginCardWidget(QFrame):
         self.event_bus.theme_changed.connect(self._on_theme_changed)
 
     def setVisible(self, visible: bool):
-        # 绝不允许作为无父级的独立顶级窗口显示
+        # 绝不允许作为无父级的独立顶级窗口显示，避免在挂载前被 Win32 提升为独立桌面窗口
         if visible and self.parentWidget() is None:
+            self._pending_visible = True
             return
+        self._pending_visible = False
         super().setVisible(visible)
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.ParentChange:
+            if getattr(self, "_pending_visible", False) and self.parentWidget() is not None:
+                self._pending_visible = False
+                self.setVisible(True)
+        super().changeEvent(event)
 
     def update_card_size(self, width: int, height: int):
         """动态更新卡片物理尺寸"""

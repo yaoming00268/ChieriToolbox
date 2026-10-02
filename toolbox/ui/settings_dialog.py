@@ -720,38 +720,20 @@ class SettingsDialog(QDialog):
         disabled_plugins = set(self.config_manager.get_disabled_plugins())
         tray_plugins = set(self.config_manager.get_tray_plugins())
 
-        # 清空已有插件项
-        for cb in self._plugin_checkboxes.values():
-            parent_frame = cb.parentWidget()
-            if parent_frame:
-                parent_frame.hide()
-                parent_frame.setParent(None)
-                parent_frame.deleteLater()
-            else:
-                cb.hide()
-                cb.setParent(None)
-                cb.deleteLater()
+        # 清空已有插件项与布局中的所有项（包括伸缩占位），避免重复调用 load_settings 产生冗余占位与内存泄露
+        for layout in (self.plugin_list_layout, self.tray_list_layout, self.autostart_layout):
+            while layout.count():
+                item = layout.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.hide()
+                    w.setParent(None)
+                    w.deleteLater()
+
         self._plugin_checkboxes.clear()
         self._plugin_tray_checkboxes.clear()
-
-        # 清空托盘管理列表项
-        for cb in self._tray_checkboxes.values():
-            parent_frame = cb.parentWidget()
-            if parent_frame:
-                parent_frame.hide()
-                parent_frame.setParent(None)
-                parent_frame.deleteLater()
-            else:
-                cb.hide()
-                cb.setParent(None)
-                cb.deleteLater()
         self._tray_checkboxes.clear()
         self._tray_status_labels.clear()
-
-        for cb in self._autostart_checkboxes.values():
-            cb.hide()
-            cb.setParent(None)
-            cb.deleteLater()
         self._autostart_checkboxes.clear()
 
         # 获取开机自启配置

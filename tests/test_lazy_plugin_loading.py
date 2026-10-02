@@ -283,7 +283,68 @@ class TestLazyPluginLoading(unittest.TestCase):
             f"严禁在未挂载父容器时将卡片设置为可见引发桌面幽灵弹窗: {rogue_top_level_widgets}"
         )
 
+    def test_10_card_widget_pending_visibility_restored_on_parent_change(self):
+        """验证 PluginCardWidget 在无 parent 时 setVisible(True) 不会弹出顶层窗口，且在挂载至可见容器后自动恢复为可见"""
+        from toolbox.ui.components.card_widget import PluginCardWidget
+        from toolbox.core.plugin_base import PluginBase
+        from PySide6.QtWidgets import QVBoxLayout
+
+        class MockPlugin(PluginBase):
+            id = "mock_test_plugin"
+            name = "Mock Plugin"
+            def create_widget(self, parent=None):
+                return QWidget(parent)
+
+        plugin = MockPlugin()
+        card = PluginCardWidget(plugin)
+        # 1. 无父容器时请求可见 -> 绝不弹出为独立顶层窗口
+        card.setVisible(True)
+        self.assertFalse(card.isVisible(), "无父级时卡片绝不可成为可见顶级窗口！")
+        self.assertTrue(card._pending_visible, "卡片应记录待生效的可见状态")
+
+        # 2. 挂载到已可见的容器时，触发 ParentChange 并自动恢复可见
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        container.show()
+        QApplication.processEvents()
+
+        layout.addWidget(card)
+        QApplication.processEvents()
+
+        self.assertTrue(card.isVisible(), "挂载至可见容器后，卡片必须自动恢复为可见状态！")
+        self.assertFalse(card._pending_visible, "生效后 pending 标记必须被清除")
+
+        container.close()
+
+    def test_11_settings_dialog_repeated_load_settings_leak_free(self):
+        """验证设置对话框多次重复调用 load_settings() 时，布局占位项与组件均被完全排空，不发生伸缩项堆积或窗口泄露"""
+        from toolbox.ui.settings_dialog import SettingsDialog
+        from toolbox.core.plugin_manager import PluginManager
+
+        pm = PluginManager()
+        if not pm.get_all_plugins():
+            pm.discover_and_load()
+        plugin_count = len(pm.get_all_plugins())
+
+        dialog = SettingsDialog()
+        # 初始调用后检查项数：插件数量 + 1 个末尾 stretch
+        initial_count = dialog.plugin_list_layout.count()
+        self.assertEqual(initial_count, plugin_count + 1)
+
+        # 多次重复调用 load_settings
+        for _ in range(3):
+            dialog.load_settings()
+
+        # 验证没有残留累加的 stretch
+        self.assertEqual(
+            dialog.plugin_list_layout.count(),
+            plugin_count + 1,
+            "重复调用 load_settings 不应堆积冗余的 stretch 项"
+        )
+        dialog.close()
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
