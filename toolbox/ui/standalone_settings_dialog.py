@@ -308,7 +308,7 @@ class StandalonePluginSettingsDialog(QDialog):
         if not ok:
             print(f"[StandaloneSettings] 设置自启动异常: {msg}")
 
-        # 应用主题与参数
-        self.theme_manager.set_mode(theme_val)
+        # 应用主题与参数 (隔离全局配置)
+        self.theme_manager.set_mode(theme_val, save_config=False)
         self.settings_applied.emit()
         self.accept()

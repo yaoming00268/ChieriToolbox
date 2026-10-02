@@ -271,6 +271,7 @@ Filename: "{{app}}\\launch.bat"; Description: "立即启动 {plugin_name}"; Flag
                 )
 
             # 插件包 __init__.py
+            os.makedirs(os.path.join(tb_target, "plugins"), exist_ok=True)
             with open(os.path.join(tb_target, "plugins", "__init__.py"), "w", encoding="utf-8") as f:
                 f.write(f"# Standalone plugin package for {plugin_id}\n")
 

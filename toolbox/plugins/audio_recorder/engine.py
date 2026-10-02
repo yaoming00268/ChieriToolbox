@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 import time
+import threading
 import subprocess
 from typing import List, Optional, Tuple
 from PySide6.QtCore import QObject, Signal, QTimer
@@ -130,7 +131,7 @@ class AudioRecorderSession(QObject):
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 startupinfo=startupinfo,
                 text=True,
                 encoding="utf-8",
@@ -143,14 +144,8 @@ class AudioRecorderSession(QObject):
         time.sleep(0.3)
         poll_res = self.process.poll()
         if poll_res is not None:
-            err_msg = ""
-            try:
-                _, stderr_out = self.process.communicate(timeout=0.5)
-                err_msg = stderr_out.strip() if stderr_out else ""
-            except Exception:
-                pass
             self.process = None
-            return False, f"录音引擎启动失败 (退出码 {poll_res}): {err_msg or '设备可能被占用或不支持当前采样参数'}"
+            return False, f"录音引擎启动失败 (退出码 {poll_res}): 设备可能被占用或不支持当前采样参数"
 
         self.is_recording = True
         self.is_paused = False
@@ -220,61 +215,73 @@ class AudioRecorderSession(QObject):
         # 转码至目标输出格式
         ffmpeg_bin = find_ffmpeg_executable()
         out_fmt = self.format_choice
+        temp_wav = self.temp_wav_path
+        out_path = self.output_path
+        bitrate = self.bitrate
+
         if out_fmt == "WAV":
             # 具备原子覆写特性的安全替换
             try:
-                os.replace(self.temp_wav_path, self.output_path)
-            except Exception as e:
+                os.replace(temp_wav, out_path)
+            except Exception:
                 try:
-                    shutil.copy2(self.temp_wav_path, self.output_path)
-                    os.remove(self.temp_wav_path)
+                    shutil.copy2(temp_wav, out_path)
+                    os.remove(temp_wav)
                 except Exception as e2:
+                    self.status_changed.emit("ERROR")
                     return False, f"保存录音文件失败: {e2}"
+            self.status_changed.emit("FINISHED")
+            self.finished.emit(out_path, total_duration)
+            return True, ""
         else:
-            out_dir = os.path.dirname(os.path.abspath(self.output_path))
-            temp_transcode = os.path.join(out_dir, f"._rec_trans_{os.getpid()}_{os.path.basename(self.output_path)}")
-            cmd = [
-                ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
-                "-i", self.temp_wav_path
-            ]
-            if out_fmt == "MP3":
-                cmd.extend(["-c:a", "libmp3lame", "-b:a", self.bitrate])
-            elif out_fmt == "AAC":
-                cmd.extend(["-c:a", "aac", "-b:a", self.bitrate])
-            elif out_fmt == "FLAC":
-                cmd.extend(["-c:a", "flac"])
+            self.status_changed.emit("TRANSCODING")
 
-            cmd.append(temp_transcode)
-            creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            p_res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags)
+            def _async_transcode():
+                out_dir = os.path.dirname(os.path.abspath(out_path))
+                temp_transcode = os.path.join(out_dir, f"._rec_trans_{os.getpid()}_{os.path.basename(out_path)}")
+                cmd = [
+                    ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", temp_wav
+                ]
+                if out_fmt == "MP3":
+                    cmd.extend(["-c:a", "libmp3lame", "-b:a", bitrate])
+                elif out_fmt == "AAC":
+                    cmd.extend(["-c:a", "aac", "-b:a", bitrate])
+                elif out_fmt == "FLAC":
+                    cmd.extend(["-c:a", "flac"])
 
-            if p_res.returncode == 0 and os.path.exists(temp_transcode) and os.path.getsize(temp_transcode) > 0:
-                try:
-                    os.replace(temp_transcode, self.output_path)
-                except Exception as e:
+                cmd.append(temp_transcode)
+                creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                p_res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+
+                if p_res.returncode == 0 and os.path.exists(temp_transcode) and os.path.getsize(temp_transcode) > 0:
                     try:
-                        shutil.copy2(temp_transcode, self.output_path)
-                        os.remove(temp_transcode)
-                    except Exception as e2:
-                        return False, f"保存录音转码文件失败: {e2}"
-            else:
-                if os.path.exists(temp_transcode):
+                        os.replace(temp_transcode, out_path)
+                    except Exception:
+                        try:
+                            shutil.copy2(temp_transcode, out_path)
+                            os.remove(temp_transcode)
+                        except Exception:
+                            self.status_changed.emit("ERROR")
+                            return
                     try:
-                        os.remove(temp_transcode)
+                        if os.path.exists(temp_wav):
+                            os.remove(temp_wav)
                     except Exception:
                         pass
-                return False, f"转码失败 (FFmpeg 退出码: {p_res.returncode})"
+                    self.status_changed.emit("FINISHED")
+                    self.finished.emit(out_path, total_duration)
+                else:
+                    if os.path.exists(temp_transcode):
+                        try:
+                            os.remove(temp_transcode)
+                        except Exception:
+                            pass
+                    self.status_changed.emit("ERROR")
 
-            # 删除临时录制 WAV 文件
-            try:
-                if os.path.exists(self.temp_wav_path):
-                    os.remove(self.temp_wav_path)
-            except Exception:
-                pass
-
-        self.status_changed.emit("FINISHED")
-        self.finished.emit(self.output_path, total_duration)
-        return True, ""
+            t = threading.Thread(target=_async_transcode, daemon=True)
+            t.start()
+            return True, ""
 
     def _on_timer(self):
         if not self.is_recording:
@@ -293,3 +300,6 @@ class AudioRecorderSession(QObject):
             self.level_updated.emit(level)
         else:
             self.level_updated.emit(0.0)
+
+
+AudioRecorderEngine = AudioRecorderSession

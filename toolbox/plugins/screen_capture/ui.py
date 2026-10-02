@@ -273,7 +273,7 @@ class ScreenCaptureWidget(QWidget):
         g_rect.setColumnStretch(2, 1)
 
         g_rect.addWidget(QLabel("矩形截图快捷键:"), 0, 0)
-        self.edit_key_rect = QKeySequenceEdit(QKeySequence("F1"))
+        self.edit_key_rect = QKeySequenceEdit(QKeySequence("Ctrl+Alt+A"))
         self.edit_key_rect.setMinimumHeight(28)
         self.edit_key_rect.setMaximumWidth(160)
         self.edit_key_rect.keySequenceChanged.connect(self._on_shortcuts_changed)
@@ -323,7 +323,7 @@ class ScreenCaptureWidget(QWidget):
         g_win.setColumnStretch(2, 1)
 
         g_win.addWidget(QLabel("窗口截图快捷键:"), 0, 0)
-        self.edit_key_win = QKeySequenceEdit(QKeySequence("F2"))
+        self.edit_key_win = QKeySequenceEdit(QKeySequence("Ctrl+Alt+W"))
         self.edit_key_win.setMinimumHeight(28)
         self.edit_key_win.setMaximumWidth(160)
         self.edit_key_win.keySequenceChanged.connect(self._on_shortcuts_changed)
@@ -373,7 +373,7 @@ class ScreenCaptureWidget(QWidget):
         g_full.setColumnStretch(2, 1)
 
         g_full.addWidget(QLabel("全屏截图快捷键:"), 0, 0)
-        self.edit_key_full = QKeySequenceEdit(QKeySequence("F3"))
+        self.edit_key_full = QKeySequenceEdit(QKeySequence("Ctrl+Alt+F"))
         self.edit_key_full.setMinimumHeight(28)
         self.edit_key_full.setMaximumWidth(160)
         self.edit_key_full.keySequenceChanged.connect(self._on_shortcuts_changed)
@@ -444,7 +444,7 @@ class ScreenCaptureWidget(QWidget):
         g_long.setColumnStretch(2, 1)
 
         g_long.addWidget(QLabel("长截图分段快捷键:"), 0, 0)
-        self.edit_key_long = QKeySequenceEdit(QKeySequence("F4"))
+        self.edit_key_long = QKeySequenceEdit(QKeySequence("Ctrl+Alt+S"))
         self.edit_key_long.setMinimumHeight(28)
         self.edit_key_long.setMaximumWidth(160)
         self.edit_key_long.keySequenceChanged.connect(self._on_shortcuts_changed)
@@ -932,10 +932,10 @@ class ScreenCaptureWidget(QWidget):
         default_dir = os.path.join(os.path.expanduser("~"), "Pictures", "ToolboxScreenshots")
         self.le_save_dir.setText(cfg.get("save_dir", default_dir))
 
-        self.edit_key_rect.setKeySequence(QKeySequence(cfg.get("key_rect", "F1")))
-        self.edit_key_win.setKeySequence(QKeySequence(cfg.get("key_win", "F2")))
-        self.edit_key_full.setKeySequence(QKeySequence(cfg.get("key_full", "F3")))
-        self.edit_key_long.setKeySequence(QKeySequence(cfg.get("key_long", "F4")))
+        self.edit_key_rect.setKeySequence(QKeySequence(cfg.get("key_rect", "Ctrl+Alt+A")))
+        self.edit_key_win.setKeySequence(QKeySequence(cfg.get("key_win", "Ctrl+Alt+W")))
+        self.edit_key_full.setKeySequence(QKeySequence(cfg.get("key_full", "Ctrl+Alt+F")))
+        self.edit_key_long.setKeySequence(QKeySequence(cfg.get("key_long", "Ctrl+Alt+S")))
 
         tab_idx = cfg.get("mode_tab_idx", 0)
         if hasattr(self, "mode_tabs") and 0 <= tab_idx < self.mode_tabs.count():
@@ -992,6 +992,7 @@ class ScreenCaptureWidget(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._setup_shortcuts()
         if hasattr(self, "cb_xbox_overlay") and self.cb_xbox_overlay.isChecked():
             if not self.xbox_overlay:
                 self.xbox_overlay = XboxCaptureOverlayWidget(self)
@@ -1000,10 +1001,15 @@ class ScreenCaptureWidget(QWidget):
 
     def hideEvent(self, event):
         super().hideEvent(event)
+        self._clear_global_hotkeys()
         if hasattr(self, "xbox_overlay") and self.xbox_overlay:
             self.xbox_overlay.hide()
 
+    def on_activated(self):
+        self._setup_shortcuts()
+
     def on_deactivated(self):
+        self._clear_global_hotkeys()
         if hasattr(self, "xbox_overlay") and self.xbox_overlay:
             self.xbox_overlay.hide()
 

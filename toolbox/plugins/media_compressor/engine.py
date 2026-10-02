@@ -4,6 +4,8 @@
 """
 
 import os
+import time
+import threading
 import subprocess
 from typing import List, Tuple, Optional, Callable
 from PIL import Image
@@ -109,7 +111,9 @@ def compress_video(
     preset: str = "medium",
     audio_bitrate: str = "128k",
     scale_height: int = 0,
-    ffmpeg_exe: Optional[str] = None
+    ffmpeg_exe: Optional[str] = None,
+    cancel_callback: Optional[Callable[[], bool]] = None,
+    process_callback: Optional[Callable[[subprocess.Popen], None]] = None
 ) -> Tuple[bool, str, int, int]:
     """
     单视频批量高压处理
@@ -164,18 +168,61 @@ def compress_video(
             startupinfo.wShowWindow = subprocess.SW_HIDE
 
         creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        proc = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            startupinfo=startupinfo,
-            creationflags=creationflags,
-            text=True,
-            encoding="utf-8",
-            errors="replace"
-        )
 
-        if proc.returncode != 0:
+        def _run_cancellable(command: List[str]) -> Tuple[int, str]:
+            p = subprocess.Popen(
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+                text=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+            if process_callback:
+                process_callback(p)
+
+            stderr_lines = []
+
+            def _drain_stderr():
+                try:
+                    if p.stderr:
+                        for line in p.stderr:
+                            stderr_lines.append(line)
+                except Exception:
+                    pass
+
+            drain_thread = threading.Thread(target=_drain_stderr, daemon=True)
+            drain_thread.start()
+
+            while p.poll() is None:
+                if cancel_callback and cancel_callback():
+                    try:
+                        p.terminate()
+                        p.wait(timeout=1.0)
+                    except Exception:
+                        try:
+                            p.kill()
+                        except Exception:
+                            pass
+                    return -999, "用户已中止压缩任务"
+                time.sleep(0.1)
+
+            drain_thread.join(timeout=1.0)
+            err_out = "".join(stderr_lines)
+            return p.returncode, err_out
+
+        ret_code, err_msg = _run_cancellable(cmd)
+        if ret_code == -999:
+            if is_same_file and tmp_target and os.path.exists(tmp_target):
+                try:
+                    os.remove(tmp_target)
+                except Exception:
+                    pass
+            return False, "用户已中止压缩任务", 0, 0
+
+        if ret_code != 0:
             # 若 libsvtav1 不可用，自动尝试回退至 libx264
             if "AV1" in codec:
                 fallback_cmd = [
@@ -186,8 +233,15 @@ def compress_video(
                 if scale_height > 0:
                     fallback_cmd.extend(["-vf", f"scale=-2:{scale_height}"])
                 fallback_cmd.extend(["-c:a", "aac", "-b:a", audio_bitrate, target_output])
-                proc2 = subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, creationflags=creationflags)
-                if proc2.returncode == 0 and os.path.exists(target_output):
+                ret_code2, err_msg2 = _run_cancellable(fallback_cmd)
+                if ret_code2 == -999:
+                    if is_same_file and tmp_target and os.path.exists(tmp_target):
+                        try:
+                            os.remove(tmp_target)
+                        except Exception:
+                            pass
+                    return False, "用户已中止压缩任务", 0, 0
+                if ret_code2 == 0 and os.path.exists(target_output):
                     if is_same_file and tmp_target and os.path.exists(tmp_target):
                         os.replace(tmp_target, output_path)
                     after_size = os.path.getsize(output_path)
@@ -197,7 +251,7 @@ def compress_video(
                     os.remove(tmp_target)
                 except Exception:
                     pass
-            return False, f"FFmpeg 编码失败: {proc.stderr.strip()}", 0, 0
+            return False, f"FFmpeg 编码失败: {err_msg.strip()}", 0, 0
 
         if is_same_file and tmp_target and os.path.exists(tmp_target):
             os.replace(tmp_target, output_path)
@@ -235,9 +289,15 @@ class MediaCompressorWorker(QThread):
         self.image_params = image_params
         self.video_params = video_params
         self._is_cancelled = False
+        self._current_proc = None
 
     def cancel(self):
         self._is_cancelled = True
+        if self._current_proc:
+            try:
+                self._current_proc.terminate()
+            except Exception:
+                pass
 
     def run(self):
         success_count = 0
@@ -307,8 +367,11 @@ class MediaCompressorWorker(QThread):
                     crf=self.video_params.get("crf", 26),
                     preset=self.video_params.get("preset", "medium"),
                     audio_bitrate=self.video_params.get("audio_bitrate", "128k"),
-                    scale_height=self.video_params.get("scale_height", 0)
+                    scale_height=self.video_params.get("scale_height", 0),
+                    cancel_callback=lambda: self._is_cancelled,
+                    process_callback=lambda p: setattr(self, "_current_proc", p)
                 )
+                self._current_proc = None
 
                 if ok:
                     success_count += 1

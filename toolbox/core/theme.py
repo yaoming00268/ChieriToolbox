@@ -1103,12 +1103,13 @@ class ThemeManager(QObject):
     def is_dark(self) -> bool:
         return self._effective_theme == THEME_DARK
 
-    def set_mode(self, mode: str):
-        """设置主题模式，持久化并立即渲染"""
+    def set_mode(self, mode: str, save_config: bool = True):
+        """设置主题模式，可选持久化并立即渲染"""
         if mode not in (THEME_SYSTEM, THEME_DARK, THEME_LIGHT):
             mode = THEME_SYSTEM
         self._current_mode = mode
-        self.config_manager.set("theme", mode)
+        if save_config:
+            self.config_manager.set("theme", mode)
 
         if mode == THEME_SYSTEM:
             if not self._sys_check_timer.isActive():

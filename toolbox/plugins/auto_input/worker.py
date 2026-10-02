@@ -3,6 +3,7 @@
 支持全局热键监听、字间延迟模拟输入、目标窗口焦点保护。
 """
 
+import sys
 import time
 import ctypes
 from typing import Optional, Tuple

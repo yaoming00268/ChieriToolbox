@@ -8,6 +8,7 @@ from ctypes import wintypes
 import os
 import shutil
 import subprocess
+import sys
 import winreg
 import re
 from typing import Dict, List, Optional, Tuple

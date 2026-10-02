@@ -144,7 +144,7 @@ class StandalonePluginMainWindow(QMainWindow):
 
         theme_val = cfg.get("theme")
         if theme_val:
-            self.theme_manager.set_mode(theme_val)
+            self.theme_manager.set_mode(theme_val, save_config=False)
 
         bg_op = float(cfg.get("bg_opacity", self.config_manager.get_bg_opacity()))
         comp_op = float(cfg.get("component_opacity", self.config_manager.get_component_opacity()))
@@ -213,7 +213,7 @@ def launch_standalone(plugin_id: str, autostart: bool = False, initial_paths: Op
     cfg = ConfigManager().get(cfg_key, {})
     saved_theme = cfg.get("theme")
     if saved_theme:
-        theme_mgr.set_mode(saved_theme)
+        theme_mgr.set_mode(saved_theme, save_config=False)
 
     pm = PluginManager()
     plugin = pm.load_single_plugin(plugin_id) or pm.get_plugin(plugin_id)

@@ -292,7 +292,7 @@ class AudioRecorderWidget(QWidget):
 
     def _stop_record(self):
         self.session.stop_recording()
-        self.btn_record.setEnabled(True)
+        self.btn_record.setEnabled(False)
         self.btn_pause.setEnabled(False)
         self.btn_stop.setEnabled(False)
         self.visualizer.set_state(active=False)
@@ -307,12 +307,24 @@ class AudioRecorderWidget(QWidget):
         elif state == "PAUSED":
             self.lbl_state.setText("录音已暂停")
             self.lbl_state.setStyleSheet("color: #f59e0b; font-size: 13px; font-weight: bold;")
+        elif state == "TRANSCODING":
+            self.lbl_state.setText("录音已停止，正在进行高保真格式转码...")
+            self.lbl_state.setStyleSheet("color: #6366f1; font-size: 13px; font-weight: bold;")
+            self.btn_record.setEnabled(False)
+            self.btn_pause.setEnabled(False)
+            self.btn_stop.setEnabled(False)
         elif state == "FINISHED":
             self.lbl_state.setText("录音已完成并保存至本地")
             self.lbl_state.setStyleSheet("color: #3b82f6; font-size: 13px;")
+            self.btn_record.setEnabled(True)
+            self.btn_pause.setEnabled(False)
+            self.btn_stop.setEnabled(False)
         elif state == "ERROR":
             self.lbl_state.setText("录音异常终止")
             self.lbl_state.setStyleSheet("color: #ef4444; font-size: 13px;")
+            self.btn_record.setEnabled(True)
+            self.btn_pause.setEnabled(False)
+            self.btn_stop.setEnabled(False)
 
     def _on_record_finished(self, out_path: str, duration: float):
         if not os.path.exists(out_path):

@@ -414,8 +414,9 @@ class MediaDownloadWorker(QThread):
                                     if not self._is_paused:
                                         self.progress_changed.emit(self._last_pct, self._last_status)
 
-                    if total_size == 0 or downloaded >= total_size:
-                        return True
+                    if total_size > 0 and downloaded < total_size:
+                        raise IOError(f"下载流提前截断: 已接收 {downloaded}/{total_size} 字节")
+                    return True
                 finally:
                     self._current_resp = None
             except Exception as e:
@@ -443,7 +444,7 @@ class MediaDownloadWorker(QThread):
                     self.finished_task.emit(False, str(e))
                     return False
 
-        return True
+        return False
 
 
 class BatchMediaDownloadWorker(QThread):

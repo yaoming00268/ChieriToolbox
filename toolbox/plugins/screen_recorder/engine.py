@@ -6,6 +6,7 @@
 import os
 import sys
 import time
+import threading
 import ctypes
 import subprocess
 from typing import List, Optional, Tuple, Dict, Any
@@ -78,7 +79,8 @@ def get_available_screens() -> List[Dict[str, Any]]:
                         info.rcMonitor.top,
                         info.rcMonitor.right - info.rcMonitor.left,
                         info.rcMonitor.bottom - info.rcMonitor.top,
-                        bool(info.dwFlags & 1)
+                        bool(info.dwFlags & 1),
+                        str(info.szDevice).strip()
                     ))
                     return True
 
@@ -87,22 +89,49 @@ def get_available_screens() -> List[Dict[str, Any]]:
             except Exception:
                 win32_monitors = []
 
+        used_w32_indices = set()
         for idx, s in enumerate(screens):
             geom = s.geometry()
             dpr = s.devicePixelRatio()
             is_primary = (s == QGuiApplication.primaryScreen())
 
             matched_w32 = None
+            matched_i = -1
             if win32_monitors:
-                for m in win32_monitors:
-                    if is_primary and m[4]:
+                s_name = s.name().strip().replace("\\\\", "\\").upper()
+                for i, m in enumerate(win32_monitors):
+                    if i in used_w32_indices:
+                        continue
+                    if m[5] and m[5].replace("\\\\", "\\").upper() == s_name:
                         matched_w32 = m
+                        matched_i = i
                         break
-                if not matched_w32 and idx < len(win32_monitors):
-                    matched_w32 = win32_monitors[idx]
+                if not matched_w32 and is_primary:
+                    for i, m in enumerate(win32_monitors):
+                        if i in used_w32_indices:
+                            continue
+                        if m[4]:
+                            matched_w32 = m
+                            matched_i = i
+                            break
+                if not matched_w32:
+                    best_dist = float("inf")
+                    calc_x = geom.x() * dpr
+                    calc_y = geom.y() * dpr
+                    for i, m in enumerate(win32_monitors):
+                        if i in used_w32_indices:
+                            continue
+                        dist = (m[0] - calc_x) ** 2 + (m[1] - calc_y) ** 2
+                        if dist < best_dist:
+                            best_dist = dist
+                            matched_w32 = m
+                            matched_i = i
+
+            if matched_i >= 0:
+                used_w32_indices.add(matched_i)
 
             if matched_w32:
-                phys_x, phys_y, phys_w, phys_h, _ = matched_w32
+                phys_x, phys_y, phys_w, phys_h, *_ = matched_w32
             else:
                 phys_w = int(round(geom.width() * dpr))
                 phys_h = int(round(geom.height() * dpr))
@@ -483,25 +512,39 @@ class ScreenRecorderEngine(QObject):
         self.is_recording = False
         self.is_paused = False
 
-        if self.process:
+        proc = self.process
+        self.process = None
+        output_path = self.output_path
+
+        if proc:
             try:
                 # 发送 'q' 触发 ffmpeg 正常写入 moov 尾部
-                self.process.stdin.write(b"q\n")
-                self.process.stdin.flush()
-                self.process.wait(timeout=4)
+                proc.stdin.write(b"q\n")
+                proc.stdin.flush()
             except Exception:
+                pass
+
+        self.status_changed.emit("FINALIZING")
+
+        def _async_wait():
+            if proc:
                 try:
-                    self.process.terminate()
+                    proc.wait(timeout=4)
                 except Exception:
-                    pass
-            self.process = None
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
 
-        if not os.path.exists(self.output_path) or os.path.getsize(self.output_path) == 0:
-            self.status_changed.emit("ERROR")
-            return False, "录像文件生成为空，请确认目标窗口或录像区域是否在屏幕可视范围内。"
+            if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+                self.status_changed.emit("ERROR")
+                return
 
-        self.status_changed.emit("FINISHED")
-        self.finished.emit(self.output_path, total_duration)
+            self.status_changed.emit("FINISHED")
+            self.finished.emit(output_path, total_duration)
+
+        t = threading.Thread(target=_async_wait, daemon=True)
+        t.start()
         return True, ""
 
     def _on_timer(self):

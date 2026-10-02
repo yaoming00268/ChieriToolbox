@@ -288,11 +288,39 @@ class MainWindow(QMainWindow):
     _open_settings_dialog = open_settings_dialog
 
     def _on_settings_changed(self):
-        """响应设置变更，实时刷新视觉效果与窗口状态"""
+        """响应设置变更，实时刷新视觉效果、窗口状态与系统托盘图标"""
         self.apply_visual_settings()
         for win in list(self._plugin_windows.values()):
             if win.isVisible():
                 win.apply_visual_settings()
+        self._sync_plugin_trays()
+
+    def _sync_plugin_trays(self):
+        """增量同步独立插件系统托盘图标状态"""
+        try:
+            from toolbox.core.tray_manager import PluginTrayManager
+            tray_mgr = PluginTrayManager()
+            target_pids = set(self.config_manager.get_tray_plugins())
+            # 1. 移除已取消托盘常驻或已禁用的插件托盘图标
+            for pid in tray_mgr.get_active_plugin_ids():
+                if pid not in target_pids:
+                    tray_mgr.remove_tray_icon(pid, save_config=True)
+                elif not self.config_manager.is_plugin_enabled(pid):
+                    tray_mgr.remove_tray_icon(pid, save_config=False)
+            # 2. 增加新启用且未建立托盘图标的插件
+            for pid in target_pids:
+                if self.config_manager.is_plugin_enabled(pid) and not tray_mgr.has_tray_icon(pid):
+                    p = self.plugin_manager.get_plugin(pid)
+                    if p:
+                        tray_mgr.add_tray_icon(
+                            p,
+                            on_open_callback=lambda target_id=pid: self.switch_to_plugin(target_id),
+                            on_settings_callback=lambda target_id=pid: self._open_plugin_settings_dialog(target_id),
+                            on_exit_callback=lambda target_id=pid: tray_mgr.remove_tray_icon(target_id),
+                            on_export_callback=lambda target_id=pid: self.home_page._open_export_dialog(target_id)
+                        )
+        except Exception as e:
+            print(f"[MainWindow] 同步托盘图标异常: {e}")
 
     def load_plugins(self):
         """扫描并加载所有插件"""
@@ -323,21 +351,7 @@ class MainWindow(QMainWindow):
                     p.handle_initial_paths(self.initial_paths)
 
         # 恢复常驻系统托盘的插件快捷图标
-        try:
-            from toolbox.core.tray_manager import PluginTrayManager
-            tray_mgr = PluginTrayManager()
-            for pid in self.config_manager.get_tray_plugins():
-                p = self.plugin_manager.get_plugin(pid)
-                if p and self.config_manager.is_plugin_enabled(pid):
-                    tray_mgr.add_tray_icon(
-                        p,
-                        on_open_callback=lambda target_id=pid: self.switch_to_plugin(target_id),
-                        on_settings_callback=lambda target_id=pid: self._open_plugin_settings_dialog(target_id),
-                        on_exit_callback=lambda target_id=pid: tray_mgr.remove_tray_icon(target_id),
-                        on_export_callback=lambda target_id=pid: self.home_page._open_export_dialog(target_id)
-                    )
-        except Exception as e:
-            print(f"[MainWindow] 恢复托盘图标异常: {e}")
+        self._sync_plugin_trays()
 
         # 初始化主应用系统托盘图标
         try:

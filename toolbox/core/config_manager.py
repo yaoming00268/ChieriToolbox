@@ -10,14 +10,18 @@ import threading
 from typing import Any, Dict, Optional
 
 
-def _deep_merge_dict(target: dict, source: dict) -> dict:
-    """深度递归合并字典，source 覆盖 target 中相同键的值"""
+def _deep_merge_dict(target: dict, source: dict, atomic_keys=("plugins",)) -> dict:
+    """深度递归合并字典，source 覆盖 target 中相同键的值，atomic_keys 内的子项整块覆写"""
     for k, v in source.items():
-        if k in target and isinstance(target[k], dict) and isinstance(v, dict):
-            _deep_merge_dict(target[k], v)
+        if k in atomic_keys and isinstance(target.get(k), dict) and isinstance(v, dict):
+            for sub_k, sub_v in v.items():
+                target[k][sub_k] = sub_v
+        elif k in target and isinstance(target[k], dict) and isinstance(v, dict):
+            _deep_merge_dict(target[k], v, atomic_keys=())
         else:
             target[k] = v
     return target
+
 
 
 class ConfigManager:
@@ -54,6 +58,8 @@ class ConfigManager:
             config_file = get_config_path("toolbox_config.json")
         self.config_file = config_file
         self.data: Dict[str, Any] = self._load()
+        self._deleted_keys = set()
+        self._deleted_plugin_ids = set()
 
     def reload(self):
         """从磁盘重新加载当前配置"""
@@ -125,9 +131,18 @@ class ConfigManager:
                         with open(self.config_file, "r", encoding="utf-8") as f:
                             disk_data = json.load(f)
                             if isinstance(disk_data, dict):
+                                for del_k in getattr(self, "_deleted_keys", set()):
+                                    disk_data.pop(del_k, None)
+                                for del_pid in getattr(self, "_deleted_plugin_ids", set()):
+                                    if "plugins" in disk_data and isinstance(disk_data["plugins"], dict):
+                                        disk_data["plugins"].pop(del_pid, None)
                                 self.data = _deep_merge_dict(disk_data, self.data)
                     except Exception:
                         pass
+                if hasattr(self, "_deleted_keys"):
+                    self._deleted_keys.clear()
+                if hasattr(self, "_deleted_plugin_ids"):
+                    self._deleted_plugin_ids.clear()
 
                 tmp_file = os.path.join(dir_path, f"._tmp_cfg_{os.getpid()}_{os.path.basename(self.config_file)}")
                 with open(tmp_file, "w", encoding="utf-8") as f:
@@ -157,6 +172,38 @@ class ConfigManager:
         self.data[key] = value
         if auto_save:
             self.save()
+
+    def delete(self, key: str, auto_save: bool = True) -> bool:
+        """从顶级配置中物理删除指定键"""
+        if not hasattr(self, "_deleted_keys"):
+            self._deleted_keys = set()
+        self._deleted_keys.add(key)
+        removed = self.data.pop(key, None) is not None
+        if auto_save:
+            self.save()
+        return removed
+
+    def remove(self, key: str, auto_save: bool = True) -> bool:
+        """兼容性删除接口"""
+        return self.delete(key, auto_save=auto_save)
+
+    def delete_plugin_config(self, plugin_id: str, key: Optional[str] = None, auto_save: bool = True) -> bool:
+        """从插件专属配置中物理删除指定键或清除整个插件配置"""
+        plugins = self.data.setdefault("plugins", {})
+        if plugin_id not in plugins:
+            return False
+        if key is None:
+            del plugins[plugin_id]
+            if not hasattr(self, "_deleted_plugin_ids"):
+                self._deleted_plugin_ids = set()
+            self._deleted_plugin_ids.add(plugin_id)
+            if auto_save:
+                self.save()
+            return True
+        removed = plugins[plugin_id].pop(key, None) is not None
+        if auto_save:
+            self.save()
+        return removed
 
     def get_plugin_config(self, plugin_id: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """获取指定插件的专属配置字典"""

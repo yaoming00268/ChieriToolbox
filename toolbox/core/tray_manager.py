@@ -213,14 +213,15 @@ class PluginTrayManager(QObject):
         self.tray_changed.emit(pid, True)
         return tray
 
-    def remove_tray_icon(self, plugin_id: str):
+    def remove_tray_icon(self, plugin_id: str, save_config: bool = True):
         """移除特定插件的独立托盘图标"""
         if plugin_id in self._trays:
             tray = self._trays[plugin_id]
             tray.hide()
             tray.deleteLater()
             del self._trays[plugin_id]
-        self.config_manager.set_tray_plugin(plugin_id, False)
+        if save_config:
+            self.config_manager.set_tray_plugin(plugin_id, False)
         self.tray_changed.emit(plugin_id, False)
 
     def has_tray_icon(self, plugin_id: str) -> bool:

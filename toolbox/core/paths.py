@@ -193,14 +193,12 @@ def get_audio_input_devices() -> List[str]:
     try:
         from PySide6.QtCore import QCoreApplication
         _app = QCoreApplication.instance()
-        _created_app = None
-        if not _app:
-            _created_app = QCoreApplication([])
-        from PySide6.QtMultimedia import QMediaDevices
-        for dev in QMediaDevices.audioInputs():
-            desc = dev.description().strip()
-            if desc and desc not in devices:
-                devices.append(desc)
+        if _app:
+            from PySide6.QtMultimedia import QMediaDevices
+            for dev in QMediaDevices.audioInputs():
+                desc = dev.description().strip()
+                if desc and desc not in devices:
+                    devices.append(desc)
     except Exception:
         pass
 

@@ -269,14 +269,14 @@ class ScreenRecorderWidget(QWidget):
         hk_layout.setSpacing(12)
 
         hk_layout.addWidget(QLabel("开始/停止录制快捷键:"))
-        self.edit_key_record = QKeySequenceEdit(QKeySequence("F9"))
+        self.edit_key_record = QKeySequenceEdit(QKeySequence("Ctrl+Shift+R"))
         self.edit_key_record.setMinimumHeight(28)
         self.edit_key_record.setMaximumWidth(140)
         self.edit_key_record.keySequenceChanged.connect(self._on_shortcuts_changed)
         hk_layout.addWidget(self.edit_key_record)
 
         hk_layout.addWidget(QLabel("暂停/恢复录制快捷键:"))
-        self.edit_key_pause = QKeySequenceEdit(QKeySequence("F10"))
+        self.edit_key_pause = QKeySequenceEdit(QKeySequence("Ctrl+Shift+P"))
         self.edit_key_pause.setMinimumHeight(28)
         self.edit_key_pause.setMaximumWidth(140)
         self.edit_key_pause.keySequenceChanged.connect(self._on_shortcuts_changed)
@@ -458,8 +458,8 @@ class ScreenRecorderWidget(QWidget):
         self.save_settings()
 
     def _reset_default_shortcuts(self):
-        self.edit_key_record.setKeySequence(QKeySequence("F9"))
-        self.edit_key_pause.setKeySequence(QKeySequence("F10"))
+        self.edit_key_record.setKeySequence(QKeySequence("Ctrl+Shift+R"))
+        self.edit_key_pause.setKeySequence(QKeySequence("Ctrl+Shift+P"))
         self._setup_shortcuts()
         self.save_settings()
 
@@ -603,7 +603,7 @@ class ScreenRecorderWidget(QWidget):
 
     def _stop_recording(self):
         self.engine.stop_recording()
-        self.btn_start.setEnabled(True)
+        self.btn_start.setEnabled(False)
         self.btn_pause.setEnabled(False)
         self.btn_pause.setText("暂停录制")
         self.btn_stop.setEnabled(False)
@@ -624,14 +624,24 @@ class ScreenRecorderWidget(QWidget):
             self.btn_pause.setText("继续录制")
             self.btn_pause.setIcon(get_icon("play", size=14))
             self.btn_pause.setEnabled(True)
+        elif state == "FINALIZING":
+            self.lbl_status.setText("录屏已停止，正在封装视频尾部并保存...")
+            self.lbl_status.setStyleSheet("color: #6366f1; font-size: 13px; font-weight: bold;")
+            self.btn_start.setEnabled(False)
+            self.btn_pause.setEnabled(False)
+            self.btn_stop.setEnabled(False)
         elif state == "FINISHED":
             self.lbl_status.setText("录屏完成并保存")
             self.lbl_status.setStyleSheet("color: #10b981; font-size: 13px;")
+            self.btn_start.setEnabled(True)
             self.btn_pause.setEnabled(False)
+            self.btn_stop.setEnabled(False)
         elif state == "ERROR":
             self.lbl_status.setText("录屏异常终止")
             self.lbl_status.setStyleSheet("color: #ef4444; font-size: 13px;")
+            self.btn_start.setEnabled(True)
             self.btn_pause.setEnabled(False)
+            self.btn_stop.setEnabled(False)
 
     def _on_record_finished(self, out_path: str, duration: float):
         if not os.path.exists(out_path):
@@ -711,8 +721,8 @@ class ScreenRecorderWidget(QWidget):
             if idx >= 0:
                 self.combo_mic.setCurrentIndex(idx)
 
-        key_rec = cfg.get("key_record", "F9")
-        key_pause = cfg.get("key_pause", "F10")
+        key_rec = cfg.get("key_record", "Ctrl+Shift+R")
+        key_pause = cfg.get("key_pause", "Ctrl+Shift+P")
         self.edit_key_record.setKeySequence(QKeySequence(key_rec))
         self.edit_key_pause.setKeySequence(QKeySequence(key_pause))
         self._setup_shortcuts()
@@ -742,6 +752,20 @@ class ScreenRecorderWidget(QWidget):
             "history": self.history_records[:15]
         }
         self.config_manager.set_plugin_config(self.PLUGIN_ID, cfg)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._setup_shortcuts()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._clear_global_hotkeys()
+
+    def on_activated(self):
+        self._setup_shortcuts()
+
+    def on_deactivated(self):
+        self._clear_global_hotkeys()
 
     def cleanup(self):
         self._clear_global_hotkeys()

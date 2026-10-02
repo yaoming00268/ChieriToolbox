@@ -167,20 +167,33 @@ def _safe_extract_zip(zf: zipfile.ZipFile, target_dir: str, pwd: Optional[bytes]
         zf.extract(member, target_dir, pwd=pwd)
 
 
-def _safe_extract_tar(tf: tarfile.TarFile, target_dir: str):
+def _safe_extract_one_member(tf: tarfile.TarFile, member: tarfile.TarInfo, target_dir: str):
     base_resolved = os.path.normcase(os.path.abspath(target_dir))
-    safe_members = []
-    for member in tf.getmembers():
-        target = os.path.normcase(os.path.abspath(os.path.join(base_resolved, member.name)))
+    target = os.path.normcase(os.path.abspath(os.path.join(base_resolved, member.name)))
+    try:
+        if os.path.commonpath([base_resolved, target]) != base_resolved:
+            print(f"[ArchiveManager] 警告: 拦截到 TarSlip 路径越界成员: {member.name}")
+            return
+    except (ValueError, Exception):
+        print(f"[ArchiveManager] 警告: 拦截到跨驱动器 TarSlip 成员: {member.name}")
+        return
+
+    if member.issym() or member.islnk():
+        link_target = os.path.normcase(os.path.abspath(os.path.join(os.path.dirname(target), member.linkname)))
         try:
-            if os.path.commonpath([base_resolved, target]) != base_resolved:
-                print(f"[ArchiveManager] 警告: 拦截到 TarSlip 路径越界成员: {member.name}")
-                continue
+            if os.path.commonpath([base_resolved, link_target]) != base_resolved:
+                print(f"[ArchiveManager] 警告: 拦截到 TarSlip 恶意链接成员: {member.name} -> {member.linkname}")
+                return
         except (ValueError, Exception):
-            print(f"[ArchiveManager] 警告: 拦截到跨驱动器 TarSlip 成员: {member.name}")
-            continue
-        safe_members.append(member)
-    tf.extractall(target_dir, members=safe_members)
+            print(f"[ArchiveManager] 警告: 拦截到跨驱动器 TarSlip 链接: {member.name} -> {member.linkname}")
+            return
+
+    tf.extract(member, target_dir)
+
+
+def _safe_extract_tar(tf: tarfile.TarFile, target_dir: str):
+    for member in tf:
+        _safe_extract_one_member(tf, member, target_dir)
 
 
 def extract_archive(
@@ -201,12 +214,26 @@ def extract_archive(
         if not lz4:
             return False, "系统未安装 lz4 模块"
         try:
+            # 首先探测是否为 tar.lz4 归档流
+            is_tar = False
+            try:
+                with lz4.frame.open(archive_path, mode="rb") as fin:
+                    with tarfile.open(fileobj=fin, mode="r:*") as tf:
+                        is_tar = True
+                        _safe_extract_tar(tf, output_dir)
+                        return True, f"LZ4 归档解压成功: {output_dir}"
+            except (tarfile.ReadError, tarfile.CompressionError):
+                pass
+            except Exception as e:
+                if is_tar:
+                    return False, f"LZ4 归档解压失败: {str(e)}"
+
+            # 单文件流式分块解压，杜绝 fin.read() 爆内存
             base_name = os.path.splitext(os.path.basename(archive_path))[0]
             out_file = os.path.join(output_dir, base_name)
-            with open(archive_path, "rb") as fin:
-                decomp = lz4.frame.decompress(fin.read())
-            with open(out_file, "wb") as fout:
-                fout.write(decomp)
+            with lz4.frame.open(archive_path, mode="rb") as fin:
+                with open(out_file, "wb") as fout:
+                    shutil.copyfileobj(fin, fout, length=1024 * 1024)
             return True, f"LZ4 解压成功: {out_file}"
         except Exception as e:
             return False, f"LZ4 解压失败: {str(e)}"
@@ -328,14 +355,21 @@ def create_archive(
         if not lz4:
             return False, "未安装 lz4 模块"
         try:
-            # LZ4 单文件流压缩
-            first = source_paths[0]
-            with open(first, "rb") as fin:
-                data = fin.read()
-            compressed = lz4.frame.compress(data, compression_level=compression_level)
-            with open(output_archive, "wb") as fout:
-                fout.write(compressed)
-            return True, f"LZ4 压缩完成: {output_archive}"
+            is_multi = len(source_paths) > 1 or any(os.path.isdir(p) for p in source_paths)
+            if is_multi:
+                with lz4.frame.open(output_archive, mode="wb", compression_level=compression_level) as lz4_out:
+                    with tarfile.open(fileobj=lz4_out, mode="w|") as tf:
+                        for sp in source_paths:
+                            arcname = os.path.basename(sp)
+                            tf.add(sp, arcname=arcname)
+                return True, f"LZ4 归档压缩完成: {output_archive}"
+            else:
+                # 单文件流式压缩 (分块复制，杜绝 MemoryError)
+                first = source_paths[0]
+                with open(first, "rb") as fin:
+                    with lz4.frame.open(output_archive, mode="wb", compression_level=compression_level) as fout:
+                        shutil.copyfileobj(fin, fout, length=1024 * 1024)
+                return True, f"LZ4 压缩完成: {output_archive}"
         except Exception as e:
             return False, f"LZ4 压缩失败: {str(e)}"
 

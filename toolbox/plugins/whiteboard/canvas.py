@@ -77,13 +77,25 @@ class WhiteboardCanvas(QWidget):
             self.can_undo_changed.emit(len(self.undo_stack) > 1)
             self.can_redo_changed.emit(False)
 
+    def _adapt_pixmap_size(self, pix: QPixmap) -> QPixmap:
+        w = max(100, self.width(), self.canvas_pixmap.width() if self.canvas_pixmap else 100)
+        h = max(100, self.height(), self.canvas_pixmap.height() if self.canvas_pixmap else 100)
+        if pix.width() < w or pix.height() < h:
+            new_pix = QPixmap(max(w, pix.width()), max(h, pix.height()))
+            new_pix.fill(Qt.transparent)
+            p = QPainter(new_pix)
+            p.drawPixmap(0, 0, pix)
+            p.end()
+            return new_pix
+        return pix.copy()
+
     def undo(self):
         if len(self.undo_stack) > 1:
             curr = self.undo_stack.pop()
             self.redo_stack.append(curr)
             if len(self.redo_stack) > self.max_history:
                 self.redo_stack.pop(0)
-            self.canvas_pixmap = self.undo_stack[-1].copy()
+            self.canvas_pixmap = self._adapt_pixmap_size(self.undo_stack[-1])
             self.can_undo_changed.emit(len(self.undo_stack) > 1)
             self.can_redo_changed.emit(True)
             self.update()
@@ -94,7 +106,7 @@ class WhiteboardCanvas(QWidget):
             self.undo_stack.append(state)
             if len(self.undo_stack) > self.max_history:
                 self.undo_stack.pop(0)
-            self.canvas_pixmap = state.copy()
+            self.canvas_pixmap = self._adapt_pixmap_size(state)
             self.can_undo_changed.emit(True)
             self.can_redo_changed.emit(len(self.redo_stack) > 0)
             self.update()

@@ -496,10 +496,12 @@ class HomePage(QWidget):
         self._filter_and_render_cards()
 
     def _on_search_enter_pressed(self):
+        """按下 Enter 键立即完成过滤并直接进入当前首个匹配的插件模块"""
         self._search_debounce_timer.stop()
         self._filter_and_render_cards()
-        if len(self.card_widgets) == 1:
-            self.card_widgets[0].clicked.emit(self.card_widgets[0].plugin_id)
+        if self.card_widgets:
+            first_card = self.card_widgets[0]
+            self.open_plugin_requested.emit(first_card.plugin_id)
 
     def _filter_and_render_cards(self):
         # 移除已有网格布局项（隐藏池化卡片，仅销毁非池化临时组件如空状态提示）
@@ -703,11 +705,6 @@ class HomePage(QWidget):
                     return True
         return super().eventFilter(watched, event)
 
-    def _on_search_enter_pressed(self):
-        """按下 Enter 键直接进入当前首个匹配的插件模块"""
-        if self.card_widgets:
-            first_card = self.card_widgets[0]
-            self.open_plugin_requested.emit(first_card.plugin_id)
 
     def _on_theme_changed(self, theme_name: str):
         self._update_logo()
