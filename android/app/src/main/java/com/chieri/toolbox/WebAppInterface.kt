@@ -516,9 +516,11 @@ class WebAppInterface(private val activity: MainActivity) {
             val bytes = Base64.decode(clean, Base64.DEFAULT)
             val lowerName = filename.lowercase()
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val folderName = filename.replace(Regex("\\.(tar\\.(gz|bz2|lz4|xz)|tgz|tbz2|txz|zip|tar|gz|bz2|lz4|7z)$", RegexOption.IGNORE_CASE), "") + "_extracted"
+            val safeBase = File(filename).name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            val folderName = safeBase.replace(Regex("\\.(tar\\.(gz|bz2|lz4|xz)|tgz|tbz2|txz|zip|tar|gz|bz2|lz4|7z)$", RegexOption.IGNORE_CASE), "") + "_extracted"
             val targetDir = File(downloadDir, folderName)
             if (!targetDir.exists()) targetDir.mkdirs()
+            val targetCanonical = targetDir.canonicalPath
 
             var extractedCount = 0
             val scannedPaths = mutableListOf<String>()
@@ -530,7 +532,13 @@ class WebAppInterface(private val activity: MainActivity) {
                     val sevenZ = SevenZFile(tempFile)
                     var entry = sevenZ.nextEntry
                     while (entry != null) {
-                        val outFile = File(targetDir, entry.name.replace("\\", "/"))
+                        val entryPath = entry.name.replace("\\", "/")
+                        val outFile = File(targetDir, entryPath)
+                        val outCanonical = outFile.canonicalPath
+                        if (!outCanonical.startsWith(targetCanonical + File.separator) && outCanonical != targetCanonical) {
+                            entry = sevenZ.nextEntry
+                            continue
+                        }
                         if (entry.isDirectory) {
                             outFile.mkdirs()
                         } else {
@@ -581,7 +589,13 @@ class WebAppInterface(private val activity: MainActivity) {
                     val zip = ZipArchiveInputStream(inStream)
                     var ze = zip.nextZipEntry
                     while (ze != null) {
-                        val outFile = File(targetDir, ze.name.replace("\\", "/"))
+                        val zePath = ze.name.replace("\\", "/")
+                        val outFile = File(targetDir, zePath)
+                        val outCanonical = outFile.canonicalPath
+                        if (!outCanonical.startsWith(targetCanonical + File.separator) && outCanonical != targetCanonical) {
+                            ze = zip.nextZipEntry
+                            continue
+                        }
                         if (ze.isDirectory) {
                             outFile.mkdirs()
                         } else {
@@ -597,7 +611,13 @@ class WebAppInterface(private val activity: MainActivity) {
                     val tar = TarArchiveInputStream(inStream)
                     var te = tar.nextTarEntry
                     while (te != null) {
-                        val outFile = File(targetDir, te.name.replace("\\", "/"))
+                        val tePath = te.name.replace("\\", "/")
+                        val outFile = File(targetDir, tePath)
+                        val outCanonical = outFile.canonicalPath
+                        if (!outCanonical.startsWith(targetCanonical + File.separator) && outCanonical != targetCanonical) {
+                            te = tar.nextTarEntry
+                            continue
+                        }
                         if (te.isDirectory) {
                             outFile.mkdirs()
                         } else {
@@ -610,10 +630,14 @@ class WebAppInterface(private val activity: MainActivity) {
                     }
                     tar.close()
                 } else {
-                    val singleOut = File(targetDir, folderName.removeSuffix("_extracted"))
-                    FileOutputStream(singleOut).use { inStream.copyTo(it) }
-                    extractedCount++
-                    scannedPaths.add(singleOut.absolutePath)
+                    val singleBase = File(folderName.removeSuffix("_extracted")).name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                    val singleOut = File(targetDir, singleBase)
+                    val outCanonical = singleOut.canonicalPath
+                    if (outCanonical.startsWith(targetCanonical + File.separator) || outCanonical == targetCanonical) {
+                        FileOutputStream(singleOut).use { inStream.copyTo(it) }
+                        extractedCount++
+                        scannedPaths.add(singleOut.absolutePath)
+                    }
                 }
             }
 

@@ -1,5 +1,11 @@
 # 千绘莉的多功能工具箱 (Chieri Toolbox)
 
+[![Release](https://img.shields.io/github/v/release/yaoming00268/ChieriToolbox?color=blue&label=Release)](https://github.com/yaoming00268/ChieriToolbox/releases/tag/v2.0.0)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-green)](https://github.com/yaoming00268/ChieriToolbox/releases/tag/v2.0.0)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple?logo=kotlin)](https://kotlinlang.org/)
+[![License](https://img.shields.io/badge/License-MIT-brightgreen)](https://github.com/yaoming00268/ChieriToolbox)
+
 > 一只二次元死宅为了彻底偷懒而搓出来的 (｀・ω・´)
 
 诸君，我喜欢偷懒，我十分喜欢偷懒，我非常喜欢把一万个散落在各个角落的 Python 脚本、命令行小工具和杂七杂八功能统统塞进同一个现代化暗黑窗口里口牙！
@@ -141,21 +147,27 @@
 
 ## 预构建封装包 (Releases 下载)
 
-懒得配环境的诸君请直接前往 GitHub Releases 页面下载预打包二进制产物：
+懒得配环境的诸君请直接前往 [GitHub Releases v2.0.0 官方发布页面](https://github.com/yaoming00268/ChieriToolbox/releases/tag/v2.0.0) 下载预打包二进制产物：
 
-1. **官方标准安装包 (`Setup_ChieriToolbox.exe`)**
-   - 基于 Inno Setup 6 编译构建，集成 LZMA2 固实极速压缩。
-   - 包含完整的 Python 运行环境、PySide6 依赖库、矢量资源及四大外部核心可执行文件。
-   - 提供桌面与开始菜单快捷方式、卸载向导及可选开机托盘驻留。
+| 分发包文件 | 平台架构 | 文件大小 | 特性说明与直链高速下载 |
+|:---|:---:|:---:|:---|
+| **[📦 Setup_ChieriToolbox.exe](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/Setup_ChieriToolbox.exe)** | Windows x64 | ~170 MB | 基于 Inno Setup 6 编译构建的标准单文件安装向导，内置 LZMA2 固实压缩、四大引擎 (FFmpeg, 7-Zip, FFprobe, FFplay) 与桌面/开始菜单快捷方式 |
+| **[📦 ChieriToolbox-v2.0.0-Portable.zip](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/ChieriToolbox-v2.0.0-Portable.zip)** | Windows x64 | ~228 MB | 绿色免安装便携版，解压至任意目录双击 `ChieriToolbox.exe` 即开即用，配置持久化于当前目录，纯净不污染系统 |
+| **[📱 ChieriToolbox-Android.apk](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/ChieriToolbox-Android.apk)** | Android 8.0+ (ARM64/x86) | ~6.14 MB | Android 极简轻量移动端，内置 Kotlin 原生硬件加速 + 100% SVG 矢量 UI + 双轨悬浮窗，体积超轻，离线全自包含 |
 
-2. **绿色便携免安装版 (`ChieriToolbox-v2.0.0-Portable.zip`)**
-   - 解压至任意文件夹，双击 `ChieriToolbox.exe` 即可直接运行。
-   - 所有配置均保存在程序自身同级目录的 `toolbox_config.json`，U 盘随插随用，纯净不污染系统。
+### 移动端 Android 安装包使用指引
 
-3. **Android 移动端安装包 (`ChieriToolbox-Android.apk`)**
-   - 支持 Android 8.0 及以上版本 (API 26+，覆盖 99%+ 机型)。
-   - 自包含完整运行时与离线资源，零外部依赖，安装包仅约 6MB。
-   - 下载至手机后直接点击安装，开箱即用。
+1. **安装步骤**：
+   - 手机浏览器或 PC 下载 `ChieriToolbox-Android.apk`，在手机文件管理器中点击安装。
+   - 若系统弹出“允许来自此来源的应用”或未知应用来源安装确认，点击“允许”或“继续安装”即可。
+2. **权限授权与隐私安全**：
+   - **网络权限 (`INTERNET`)**：用于 B站/YouTube 媒体流解析下载与 OpenAI/DeepL/百度在线翻译，网络请求均由本地发起，绝不上传任何隐私。
+   - **文件存储**：自动适配 Android 10+ 分区存储规范，下载的音视频与解压文件默认落盘于公共 `Download/` 目录，无需授予危险的 `MANAGE_EXTERNAL_STORAGE` 权限。
+   - **系统级悬浮窗 (`SYSTEM_ALERT_WINDOW`)**：若需使用退至后台/桌面也能随时拉起的“全局贴边悬浮球”，首次在应用设置中开启时，系统会自动引导跳转授权“显示在其他应用上层”，授权后即刻生效。
+3. **国产定制 ROM (MIUI/澎湃OS/鸿蒙/ColorOS/OriginOS) 保活建议**：
+   - 若开启“全局系统悬浮窗”后，应用切至后台被系统电池管理强杀，建议前往系统“设置 -> 应用管理 -> 千绘莉工具箱”：
+     - 允许“自启动 / 关联启动”；
+     - 将电池策略设为“无限制 / 不受省电策略限制”。
 
 ---
 
@@ -180,9 +192,12 @@ pip install -r requirements.txt  # 或安装 PySide6, requests, Pillow, yt-dlp
 或者直接双击根目录下的 `启动工具箱.bat`。
 
 ### 3. 执行自动化测试套件
-本项目具备完备的测试验证体系（涵盖 B站音视频流水线、图片裁剪缩放、音频剪裁与 22 插件完整生命周期）：
+本项目具备完备的测试验证体系（涵盖 222 项全量自动化测试、B站音视频流水线、图片裁剪缩放、音频剪裁与 22 插件完整生命周期）：
 ```powershell
-.\.venv\Scripts\python.exe -m unittest tests/test_toolbox.py tests/test_real_suite.py
+# 运行全量 222 项自动化集成测试
+.\.venv\Scripts\pytest
+
+# 运行桌面端动态寻路与核心引擎冒烟测试
 .\.venv\Scripts\python.exe main.py --smoke-test
 ```
 
