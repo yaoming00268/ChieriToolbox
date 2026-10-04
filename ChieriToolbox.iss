@@ -7,9 +7,9 @@ AppId={{C3F719E8-5182-4EAE-A3C9-1234567890AB}}
 AppName=千绘莉多功能工具箱
 AppVersion=2.0.0
 AppPublisher=Chieri
-AppPublisherURL=https://github.com/chieri-toolbox
-AppSupportURL=https://github.com/chieri-toolbox
-AppUpdatesURL=https://github.com/chieri-toolbox
+AppPublisherURL=https://github.com/yaoming00268/ChieriToolbox
+AppSupportURL=https://github.com/yaoming00268/ChieriToolbox
+AppUpdatesURL=https://github.com/yaoming00268/ChieriToolbox
 DefaultDirName={autopf}\ChieriToolbox
 DefaultGroupName=千绘莉多功能工具箱
 DisableProgramGroupPage=no
@@ -33,7 +33,7 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 Name: "autostart"; Description: "开机自动启动并在系统托盘常驻"; GroupDescription: "系统集成:"; Flags: unchecked
 
 [Files]
-Source: "dist\ChieriToolbox\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.log,*.tmp,*.m4s,*.bak,smoke_test_report.json,verified_*.png,toolbox_config.json,*.local.json,test_*.txt"
+Source: "dist\ChieriToolbox\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.log,*.tmp,*.m4s,*.bak,smoke_test_report.json,verified_*.png,toolbox_config.json,*.local.json,test_*.txt,*.lock"
 
 [Icons]
 Name: "{group}\千绘莉多功能工具箱"; Filename: "{app}\ChieriToolbox.exe"; IconFilename: "{app}\app_icon.ico"; WorkingDir: "{app}"

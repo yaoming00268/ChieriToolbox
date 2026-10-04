@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_primary">#121218</color>
+    <color name="bg_secondary">#1E1E2A</color>
+    <color name="accent_pink">#FF6B8B</color>
+    <color name="accent_purple">#845EC2</color>
+    <color name="accent_cyan">#00C9A7</color>
+    <color name="text_primary">#F0F2F5</color>
+    <color name="text_secondary">#9E9EA7</color>
+    <color name="status_bar">#0E0E14</color>
+</resources>

@@ -1,0 +1,40 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Outer precision geometric ring -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeAlpha="0.6"
+        android:pathData="M24,4 A20,20 0 1,0 24,44 A20,20 0 1,0 24,4 Z" />
+
+    <!-- Corner ticks / tech brackets -->
+    <path
+        android:strokeColor="#00C9A7"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round"
+        android:pathData="M14,14 L10,14 L10,18 M34,14 L38,14 L38,18 M14,34 L10,34 L10,30 M34,34 L38,34 L38,30" />
+
+    <!-- Center geometric prism core -->
+    <path
+        android:fillColor="#FF6B8B"
+        android:fillAlpha="0.25"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.0"
+        android:strokeLineJoin="round"
+        android:pathData="M24,11 L35,24 L24,37 L13,24 Z" />
+
+    <!-- Inner tech diamond nucleus -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,19 L29,24 L24,29 L19,24 Z" />
+
+    <!-- Radiant center spark -->
+    <path
+        android:fillColor="#00C9A7"
+        android:pathData="M24,22 A2,2 0 1,0 24,26 A2,2 0 1,0 24,22 Z" />
+
+</vector>

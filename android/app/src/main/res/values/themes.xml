@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.ChieriToolbox" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/status_bar</item>
+        <item name="android:navigationBarColor">@color/status_bar</item>
+        <item name="android:windowBackground">@color/bg_primary</item>
+        <item name="colorPrimary">@color/accent_pink</item>
+        <item name="colorPrimaryVariant">@color/accent_purple</item>
+        <item name="colorSecondary">@color/accent_cyan</item>
+    </style>
+</resources>

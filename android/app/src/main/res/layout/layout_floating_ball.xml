@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/llBallContainer"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_floating_ball"
+        android:gravity="center"
+        android:elevation="8dp">
+
+        <ImageView
+            android:id="@+id/ivBallIcon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_floating_core"
+            android:contentDescription="悬浮窗核芯" />
+    </LinearLayout>
+
+</FrameLayout>

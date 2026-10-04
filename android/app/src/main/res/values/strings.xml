@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">千绘莉工具箱</string>
+    <string name="floating_ball_title">千绘莉悬浮窗</string>
+    <string name="floating_ball_desc">快捷工具入口</string>
+</resources>

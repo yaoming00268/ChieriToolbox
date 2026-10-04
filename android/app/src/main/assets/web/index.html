@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark" data-card-size="standard">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>千绘莉的多功能工具箱 (Chieri Toolbox Mobile)</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <button class="icon-btn" id="btn-open-drawer" title="打开侧边导航">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <div class="brand-info">
+        <span class="brand-title">千绘莉工具箱</span>
+        <span class="brand-subtitle">轻量移动版 v2.6.0</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <!-- Dark / Light Quick Theme Switch -->
+      <button class="icon-btn" id="btn-toggle-theme" title="切换深色/浅色模式">
+        <svg id="icon-theme-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg id="icon-theme-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+
+      <!-- Return Home / Esc -->
+      <button class="icon-btn esc-escape-btn" title="回城 (仪表盘)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Drawer Backdrop & Slide-out Sidebar -->
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer-sidebar" id="drawer-sidebar">
+    <div class="drawer-header">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="chieri-avatar-box">
+          <div class="chieri-avatar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2.8C10.8 5 10.8 7.2 12 9c1.2-1.8 1.2-4 0-6.2z"></path>
+              <path d="M20.7 9.1C18.6 8.3 16.5 9 15.4 11.2c2.1.2 4.1-.7 5.3-2.1z"></path>
+              <path d="M17.4 19.4C16.8 17.2 15 15.9 12.8 16.6c1.3 1.7 3.2 2.8 4.6 2.8z"></path>
+              <path d="M6.6 19.4C8 19.4 9.9 18.3 11.2 16.6c-2.2-.7-4 .6-4.6 2.8z"></path>
+              <path d="M3.3 9.1c1.2 1.4 3.2 2.3 5.3 2.1C7.5 9 5.4 8.3 3.3 9.1z"></path>
+              <circle cx="12" cy="12" r="2.2"></circle>
+            </svg>
+          </div>
+          <div class="chieri-info">
+            <h3>千绘莉の武器库</h3>
+            <p>移动端高能生产力工具集</p>
+          </div>
+        </div>
+        <button class="icon-btn" id="btn-close-drawer" style="width: 32px; height: 32px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Quick Floating Ball Switch Inside Drawer -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+        <span style="font-size: 12px; font-weight: 500; color: var(--text-main);">屏幕悬浮球开关</span>
+        <label class="switch">
+          <input type="checkbox" id="drawer-floating-ball-switch" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Drawer Navigation Menu -->
+    <nav class="drawer-menu">
+      <div class="drawer-category-title">常用核心</div>
+      <a class="menu-item active" data-tool="dashboard">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+        </span>
+        <span>首页仪表盘</span>
+        <span class="menu-badge">Home</span>
+      </a>
+
+      <a class="menu-item" data-tool="audio_converter">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M17 5v14M7 9v6M22 12h-2M4 12H2"></path>
+          </svg>
+        </span>
+        <span>音频格式转换工坊</span>
+        <span class="menu-badge" style="color: var(--accent-primary);">全格式</span>
+      </a>
+
+      <a class="menu-item" data-tool="media_downloader">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </span>
+        <span>B站/YT 媒体下载</span>
+        <span class="menu-badge" style="color: var(--accent-vip);">4K/大会员</span>
+      </a>
+
+      <a class="menu-item" data-tool="archive_manager">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="21 8 21 21 3 21 3 8"></polyline>
+            <rect x="1" y="3" width="22" height="5"></rect>
+            <line x1="10" y1="12" x2="14" y2="12"></line>
+          </svg>
+        </span>
+        <span>多格式归档压缩解压</span>
+        <span class="menu-badge">7Z/TAR/GZ</span>
+      </a>
+
+      <a class="menu-item" data-tool="translator">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+        </span>
+        <span>智能 AI / 二次元翻译</span>
+        <span class="menu-badge">API配置</span>
+      </a>
+
+      <a class="menu-item" data-tool="ncm_decryptor">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+          </svg>
+        </span>
+        <span>网易云 NCM 解密</span>
+        <span class="menu-badge">无损</span>
+      </a>
+
+      <div class="drawer-category-title">影音与效率</div>
+      <a class="menu-item" data-tool="image_master">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </span>
+        <span>图片批处理工坊</span>
+        <span class="menu-badge">1:1头像</span>
+      </a>
+
+      <a class="menu-item" data-tool="osu_skin_studio">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="11" x2="10" y2="11"></line>
+            <line x1="8" y1="9" x2="8" y2="13"></line>
+            <line x1="15" y1="12" x2="15.01" y2="12"></line>
+            <line x1="18" y1="10" x2="18.01" y2="10"></line>
+            <rect x="2" y="6" width="20" height="12" rx="4"></rect>
+          </svg>
+        </span>
+        <span>osu!mania 皮肤调校</span>
+        <span class="menu-badge">4K/7K</span>
+      </a>
+
+      <a class="menu-item" data-tool="whiteboard">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+            <path d="M2 2l7.586 7.586"></path>
+            <circle cx="11" cy="11" r="2"></circle>
+          </svg>
+        </span>
+        <span>二次元便签白板</span>
+        <span class="menu-badge">触控</span>
+      </a>
+
+      <a class="menu-item" data-tool="file_suite">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+          </svg>
+        </span>
+        <span>文件批量整理</span>
+        <span class="menu-badge">正则</span>
+      </a>
+
+      <div class="drawer-category-title">平台与设置</div>
+      <a class="menu-item" data-tool="compatibility_matrix">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </span>
+        <span>PC跨端特性对齐清单</span>
+        <span class="menu-badge">矩阵</span>
+      </a>
+
+      <a class="menu-item" data-tool="settings">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </span>
+        <span>外观与高级自定义中心</span>
+        <span class="menu-badge">UI设置</span>
+      </a>
+    </nav>
+
+    <div class="drawer-footer">
+      <button class="btn-secondary esc-escape-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        </svg>
+        <span>返回首页仪表盘</span>
+      </button>
+      <div style="text-align: center; font-size: 11px; color: var(--text-muted);">
+        Chieri Toolbox Mobile · Android SDK 34
+      </div>
+    </div>
+  </aside>
+
+  <!-- Phone-Exclusive Floating Ball & Quick Menu -->
+  <div id="floating-ball-container">
+    <div class="floating-ball" id="floating-ball" title="悬浮球菜单">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-primary);">
+        <circle cx="12" cy="12" r="10"></circle>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    </div>
+
+    <!-- Quick Bubble Menu -->
+    <div class="floating-menu-popup" id="floating-ball-menu">
+      <div class="float-menu-header">
+        <span>千绘莉快捷悬浮</span>
+        <span style="cursor:pointer; padding: 2px;" onclick="window.closeFloatingMenu && window.closeFloatingMenu()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </span>
+      </div>
+      <div class="float-menu-item" data-action="home">仪表盘</div>
+      <div class="float-menu-item" data-action="audio">音频转换工坊</div>
+      <div class="float-menu-item" data-action="downloader">B站/YT 媒体下载</div>
+      <div class="float-menu-item" data-action="archive">多格式解压</div>
+      <div class="float-menu-item" data-action="translator">智能 AI 翻译</div>
+      <div class="float-menu-item" data-action="settings">外观与偏好设置</div>
+      <div class="float-menu-item danger" data-action="close_ball">隐藏悬浮球</div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- Panel 0: Dashboard (首页仪表盘) -->
+    <section class="tool-view-panel active" id="panel-dashboard">
+      <!-- Search Box -->
+      <div class="search-box">
+        <span class="search-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </span>
+        <input type="text" id="search-input" class="search-input" placeholder="输入插件功能或格式关键字快速过滤..." />
+      </div>
+
+      <!-- Category Filter Chips -->
+      <div class="filter-scroll">
+        <button class="filter-chip active" data-category="all">全部武器</button>
+        <button class="filter-chip" data-category="core">核心音视频</button>
+        <button class="filter-chip" data-category="archive">归档解压</button>
+        <button class="filter-chip" data-category="ai">AI与翻译</button>
+        <button class="filter-chip" data-category="image">图像处理</button>
+        <button class="filter-chip" data-category="osu">音游调校</button>
+        <button class="filter-chip" data-category="system">系统跨端</button>
+      </div>
+
+      <!-- Tools Grid -->
+      <div class="tools-grid">
+        <!-- Audio Converter -->
+        <div class="tool-card" data-tool="audio_converter" data-category="core" data-tags="音频 转换 mp3 wav flac aac ogg m4a 采样率 码率">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v20M17 5v14M7 9v6M22 12h-2M4 12H2"></path>
+            </svg>
+          </div>
+          <div class="tool-card-title">音频格式转换</div>
+          <div class="tool-card-desc">全格式互转，支持 MP3/WAV/FLAC/AAC/OGG/M4A，自定义采样率与高码率调校</div>
+          <div class="tool-card-tag">全格式互转</div>
+        </div>
+
+        <!-- Media Downloader -->
+        <div class="tool-card" data-tool="media_downloader" data-category="core" data-tags="b站 bilibili youtube 视频 音频 下载 4k 1080p 大会员 sessdata">
+          <div class="tool-card-icon" style="color: var(--accent-vip);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </div>
+          <div class="tool-card-title">B站/YT 媒体收割</div>
+          <div class="tool-card-desc">支持 SESSDATA 凭据认证，解锁 4K/1080P60 及杜比全景声 DASH 音画分离流</div>
+          <div class="tool-card-tag" style="color: var(--accent-vip); background: rgba(245, 158, 11, 0.12);">4K/大会员</div>
+        </div>
+
+        <!-- Archive Manager -->
+        <div class="tool-card" data-tool="archive_manager" data-category="archive" data-tags="zip tar gz tgz bz2 7z lz4 归档 解压 压缩 浏览">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="21 8 21 21 3 21 3 8"></polyline>
+              <rect x="1" y="3" width="22" height="5"></rect>
+              <line x1="10" y1="12" x2="14" y2="12"></line>
+            </svg>
+          </div>
+          <div class="tool-card-title">多格式归档解压</div>
+          <div class="tool-card-desc">突破单一 ZIP 限制，拓展全面支持 TAR, GZ/TGZ, BZ2, 7Z, LZ4 等多格式浏览提取</div>
+          <div class="tool-card-tag">多格式归档</div>
+        </div>
+
+        <!-- Translator -->
+        <div class="tool-card" data-tool="translator" data-category="ai" data-tags="翻译 接口 api openai deepl google deepseek 二次元 词典">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </div>
+          <div class="tool-card-title">智能 AI 翻译</div>
+          <div class="tool-card-desc">支持自由配置大模型 API（DeepSeek / GPT / Qwen / DeepL / 谷歌）与离线二次元速查</div>
+          <div class="tool-card-tag">AI/自由API</div>
+        </div>
+
+        <!-- NCM Decryptor -->
+        <div class="tool-card" data-tool="ncm_decryptor" data-category="core" data-tags="ncm 网易云 音乐 解密 flac mp3 封面">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </div>
+          <div class="tool-card-title">网易云 NCM 解密</div>
+          <div class="tool-card-desc">纯前端 AES+RC4 逆向解密，还原无损 MP3/FLAC 并保留内嵌封面与元数据</div>
+          <div class="tool-card-tag">无损还原</div>
+        </div>
+
+        <!-- Image Master -->
+        <div class="tool-card" data-tool="image_master" data-category="image" data-tags="图片 缩放 裁剪 头像 1:1 webp png jpg 转换">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+          </div>
+          <div class="tool-card-title">图片批处理工坊</div>
+          <div class="tool-card-desc">全格式互转，1:1 正方形头像居中裁切，无失真高保真缩放</div>
+          <div class="tool-card-tag">1:1裁切</div>
+        </div>
+
+        <!-- osu!mania Studio -->
+        <div class="tool-card" data-tool="osu_skin_studio" data-category="osu" data-tags="osu mania 音游 皮肤 判定线 4k 7k skin.ini">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="6" y1="11" x2="10" y2="11"></line>
+              <line x1="8" y1="9" x2="8" y2="13"></line>
+              <rect x="2" y="6" width="20" height="12" rx="4"></rect>
+            </svg>
+          </div>
+          <div class="tool-card-title">osu!mania 调校台</div>
+          <div class="tool-card-desc">可视化调校判定线与列宽，实时视口 60FPS 预览并导出标准 skin.ini</div>
+          <div class="tool-card-tag">实时视口</div>
+        </div>
+
+        <!-- Whiteboard -->
+        <div class="tool-card" data-tool="whiteboard" data-category="image" data-tags="白板 便签 画板 涂鸦 触控 手写">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+              <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+            </svg>
+          </div>
+          <div class="tool-card-title">二次元便签白板</div>
+          <div class="tool-card-desc">专为触控调优的暗黑便签涂鸦板，多色笔刷与高清图片一键导出</div>
+          <div class="tool-card-tag">触控便签</div>
+        </div>
+
+        <!-- File Suite -->
+        <div class="tool-card" data-tool="file_suite" data-category="system" data-tags="文件 重命名 正则 批量 补零 前缀 后缀">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+            </svg>
+          </div>
+          <div class="tool-card-title">文件批量整理</div>
+          <div class="tool-card-desc">正则改名、前缀后缀替换、数字补零对齐，整顿同人本图包神器</div>
+          <div class="tool-card-tag">批量整理</div>
+        </div>
+
+        <!-- PC Platform Compatibility Matrix -->
+        <div class="tool-card" data-tool="compatibility_matrix" data-category="system" data-tags="pc 桌面 安卓 对齐 兼容性 沙盒 进程 pac 键盘 录屏">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <div class="tool-card-title">跨端特性全景清单</div>
+          <div class="tool-card-desc">全景梳理桌面端移植进度，清晰标定安卓系统沙盒限制特性与高可用平替</div>
+          <div class="tool-card-tag">沙盒边界矩阵</div>
+        </div>
+
+        <!-- Settings & UI Customization Center -->
+        <div class="tool-card" data-tool="settings" data-category="system" data-tags="外观 自定义 卡片 透明度 毛玻璃 深色 浅色 设置 悬浮窗">
+          <div class="tool-card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </div>
+          <div class="tool-card-title">UI 自定义调节中心</div>
+          <div class="tool-card-desc">自由调节卡片大小、界面透明度、毛玻璃磨砂浓度及深浅色高质感模式</div>
+          <div class="tool-card-tag">外观调优</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 1: Audio Converter (音频格式转换工坊) -->
+    <section class="tool-view-panel" id="panel-audio_converter">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">音频格式转换工坊</span>
+        <span></span>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M17 5v14M7 9v6M22 12h-2M4 12H2"></path>
+          </svg>
+          选择待转换音频文件
+        </div>
+        <div class="action-box-desc">支持载入 MP3, WAV, FLAC, AAC, OGG, M4A, AMR 等全格式音频</div>
+
+        <div class="dropzone" id="audio-conv-dropzone">
+          <div class="dropzone-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </div>
+          <div class="dropzone-text" id="audio-conv-filename-display">点击选择音频文件</div>
+          <div class="dropzone-hint">本地硬件解码，无网络上传，支持原声试听与即时波形重构</div>
+        </div>
+        <input type="file" id="audio-conv-file-input" accept="audio/*,.mp3,.wav,.flac,.aac,.ogg,.m4a" style="display: none;" />
+
+        <!-- Source Player Preview -->
+        <div id="audio-source-preview-box" style="display: none; margin-bottom: 12px; background: var(--bg-input); padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 12px; font-weight: 550; color: var(--text-main);">源音频试听</span>
+            <span id="audio-source-meta-tag" class="badge">-- Hz · --</span>
+          </div>
+          <audio id="audio-source-player" controls style="width: 100%; height: 36px; outline: none;"></audio>
+        </div>
+
+        <!-- Format & Parameter Settings -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <label class="form-label">目标格式</label>
+            <select id="audio-target-format" class="form-input">
+              <option value="mp3">MP3 (超高兼容性)</option>
+              <option value="wav">WAV (无损 PCM)</option>
+              <option value="flac">FLAC (无损原声)</option>
+              <option value="aac">AAC (流媒体标准)</option>
+              <option value="ogg">OGG (Opus 高保真)</option>
+              <option value="m4a">M4A (苹果生态格式)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">目标采样率</label>
+            <select id="audio-target-samplerate" class="form-input">
+              <option value="44100">44.1 kHz (CD 标准)</option>
+              <option value="48000">48.0 kHz (影视原画)</option>
+              <option value="96000">96.0 kHz (Hi-Res 顶配)</option>
+              <option value="22050">22.05 kHz (低带宽高压缩)</option>
+              <option value="16000">16.0 kHz (语音专属)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label">输出比特率 (压缩码率)</label>
+          <select id="audio-target-bitrate" class="form-input">
+            <option value="320">320 kbps (录音室超高码率)</option>
+            <option value="256">256 kbps (高保真优质)</option>
+            <option value="192" selected>192 kbps (标准黄金均衡)</option>
+            <option value="128">128 kbps (网络通用轻量)</option>
+            <option value="64">64 kbps (极致省流)</option>
+          </select>
+        </div>
+
+        <button class="btn-primary" id="btn-start-audio-convert">立即开始高质量格式转换</button>
+
+        <!-- Conversion Progress -->
+        <div id="audio-conv-progress-box" style="display: none; margin-top: 10px;">
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="audio-conv-progress-fill"></div>
+          </div>
+          <div id="audio-conv-status-text" style="font-size: 11px; color: var(--text-secondary); text-align: center;">准备就绪</div>
+        </div>
+      </div>
+
+      <!-- Converted Result Card -->
+      <div class="action-box" id="audio-conv-result-box" style="display: none;">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-success);">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          转换成功！已生成目标音频
+        </div>
+
+        <div style="background: var(--bg-input); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px;">
+            <span id="audio-result-filename" style="font-weight: 600; color: var(--text-main);">converted.mp3</span>
+            <span id="audio-result-size-badge" class="badge badge-success">0.0 MB</span>
+          </div>
+          <audio id="audio-result-player" controls style="width: 100%; height: 38px; outline: none; margin-bottom: 8px;"></audio>
+          <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 12px;" id="audio-result-meta-line">
+            <span>时长: 0s</span>
+            <span>格式: MP3</span>
+            <span>采样率: 44.1kHz</span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button class="btn-primary" id="btn-save-audio-to-downloads">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>保存到手机下载目录</span>
+          </button>
+          <button class="btn-secondary" id="btn-web-download-audio">浏览器直接下载</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 2: Media Downloader (B站大会员与媒体下载) -->
+    <section class="tool-view-panel" id="panel-media_downloader">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">B站/YouTube 媒体收割</span>
+        <span></span>
+      </div>
+
+      <!-- Account / SESSDATA VIP Configuration Card -->
+      <div class="action-box">
+        <div class="action-box-title" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-vip);">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span>B站账号凭据与大会员检测 (Cookie / SESSDATA)</span>
+          </div>
+          <span id="bili-vip-status-badge" class="badge">未检测</span>
+        </div>
+        <div class="action-box-desc">
+          填入 SESSDATA 或 Cookie 字符串，解锁 1080P60 / 1080P高码率 / 4K / 杜比全景声专享音画流（凭据本地安全持久化）。
+        </div>
+
+        <input type="text" id="bili-sessdata-input" class="form-input" placeholder="贴入 SESSDATA 键值、JSON 数组或整串 Cookie..." />
+
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-primary btn-sm" id="btn-verify-bili-vip">验证大会员凭据状态</button>
+          <button class="btn-secondary btn-sm" id="btn-clear-bili-vip" style="width: auto;">清空凭据</button>
+        </div>
+      </div>
+
+      <!-- Video URL Parsing Box -->
+      <div class="action-box">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          视频音画流深度解析
+        </div>
+
+        <input type="text" id="media-url-input" class="form-input" placeholder="贴入 B站 (BV号/av号/b23.tv短链) 或 YouTube 链接..." />
+
+        <button class="btn-primary" id="btn-parse-media-url">立即解析全量音画轨道</button>
+      </div>
+
+      <!-- Parsed Video Result Detail Box -->
+      <div class="action-box" id="media-parsed-detail-box" style="display: none;">
+        <div class="action-box-title">解析详情与流媒体音轨选择</div>
+        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+          <img id="media-detail-cover" style="width: 110px; height: 75px; object-fit: cover; border-radius: var(--radius-sm); background: var(--bg-input);" />
+          <div style="display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">
+            <div id="media-detail-title" style="font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text-main); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">视频标题</div>
+            <div style="font-size: 11px; color: var(--text-muted);" id="media-detail-author">UP主: -- · 时长: --</div>
+          </div>
+        </div>
+
+        <div id="media-pages-container" style="display: none; margin-bottom: 10px;">
+          <label class="form-label">分P选集</label>
+          <select id="media-page-select" class="form-input"></select>
+        </div>
+
+        <!-- Video Tracks Select -->
+        <label class="form-label">视频流画质 (包含大会员专享流)</label>
+        <select id="media-video-track-select" class="form-input"></select>
+
+        <!-- Audio Tracks Select -->
+        <label class="form-label">音频流音轨 (包含杜比全景声与无损原声)</label>
+        <select id="media-audio-track-select" class="form-input"></select>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+          <button class="btn-secondary" id="btn-copy-media-stream-url">复制直链地址</button>
+          <button class="btn-primary" id="btn-add-download-queue">加入下载队列</button>
+        </div>
+      </div>
+
+      <!-- Queue Box -->
+      <div class="action-box">
+        <div class="action-box-title">下载管理队列</div>
+        <div class="item-list" id="media-queue-container">
+          <div style="text-align: center; font-size: 12px; color: var(--text-muted); padding: 14px;">暂无下载任务</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 3: Multi-Format Archive Manager (多格式归档压缩与解压) -->
+    <section class="tool-view-panel" id="panel-archive_manager">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">多格式归档压缩解压</span>
+        <span></span>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="21 8 21 21 3 21 3 8"></polyline>
+            <rect x="1" y="3" width="22" height="5"></rect>
+            <line x1="10" y1="12" x2="14" y2="12"></line>
+          </svg>
+          打开并解压归档压缩包
+        </div>
+        <div class="action-box-desc">全面支持 ZIP, TAR, GZ/TGZ, BZ2/TBZ2, 7Z, LZ4 多格式即时解析</div>
+
+        <div class="dropzone" id="archive-dropzone">
+          <div class="dropzone-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="21 8 21 21 3 21 3 8"></polyline>
+              <rect x="1" y="3" width="22" height="5"></rect>
+              <line x1="10" y1="12" x2="14" y2="12"></line>
+            </svg>
+          </div>
+          <div class="dropzone-text" id="archive-filename-display">点击选择压缩归档文件</div>
+          <div class="dropzone-hint">支持 .zip, .tar, .gz, .tgz, .bz2, .tbz2, .7z, .lz4 格式</div>
+        </div>
+        <input type="file" id="archive-file-input" accept=".zip,.tar,.gz,.tgz,.bz2,.tbz2,.7z,.lz4" style="display: none;" />
+      </div>
+
+      <!-- Archive Contents & Tree -->
+      <div class="action-box" id="archive-contents-box" style="display: none;">
+        <div class="action-box-title" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>归档内部文件列表</span>
+            <span id="archive-format-badge" class="badge badge-success">ZIP</span>
+          </div>
+          <span id="archive-count-badge" class="badge">0 个项目</span>
+        </div>
+
+        <input type="text" id="archive-search-filter" class="form-input" placeholder="在归档文件清单中过滤文件名..." />
+
+        <div class="item-list" id="archive-file-list" style="max-height: 320px; overflow-y: auto; margin-bottom: 12px;"></div>
+
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-primary" id="btn-extract-all-archive">一键全部解压并打包下载</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 4: Smart AI & ACG Translator (智能 AI 翻译器) -->
+    <section class="tool-view-panel" id="panel-translator">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">智能 AI 翻译器</span>
+        <span></span>
+      </div>
+
+      <!-- Model & API Configuration Center (Collapsible) -->
+      <div class="action-box">
+        <div class="action-box-title" style="justify-content: space-between; cursor: pointer;" id="btn-toggle-trans-config">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-primary);">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span>大模型与翻译 API 接口配置</span>
+          </div>
+          <span id="trans-config-status-badge" class="badge">OpenAI 兼容模式</span>
+        </div>
+
+        <div id="trans-config-panel-body" style="margin-top: 10px;">
+          <label class="form-label">翻译接口通道 (Provider)</label>
+          <select id="trans-provider-select" class="form-input">
+            <option value="openai">OpenAI 兼容大模型 (DeepSeek / GPT / Qwen / Ollama)</option>
+            <option value="google">Google 翻译开放接口 (免费免 Key)</option>
+            <option value="deepl">DeepL 翻译官方 API</option>
+            <option value="baidu">百度翻译开放平台 (AppID + 密钥)</option>
+            <option value="offline">纯离线二次元词库模式 (零网络流量)</option>
+          </select>
+
+          <!-- Quick Presets -->
+          <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+            <button class="filter-chip" id="preset-deepseek">DeepSeek 官方</button>
+            <button class="filter-chip" id="preset-openai">OpenAI 官方</button>
+            <button class="filter-chip" id="preset-qwen">阿里通义千问</button>
+            <button class="filter-chip" id="preset-local">本地 Ollama</button>
+          </div>
+
+          <div id="trans-baidu-box" style="display: none;">
+            <label class="form-label">百度翻译 App ID</label>
+            <input type="text" id="trans-baidu-appid" class="form-input" placeholder="输入百度翻译开放平台 App ID" />
+            <label class="form-label">百度翻译 密钥 (App Key)</label>
+            <input type="password" id="trans-baidu-appkey" class="form-input" placeholder="输入百度翻译密钥" />
+          </div>
+
+          <div id="trans-openai-box">
+            <label class="form-label">Base URL (接口基础地址)</label>
+            <input type="text" id="trans-base-url" class="form-input" placeholder="如: https://api.deepseek.com/v1" />
+
+            <label class="form-label">API Key (密钥凭据)</label>
+            <input type="password" id="trans-api-key" class="form-input" placeholder="填入 sk-... 凭据" />
+
+            <label class="form-label">模型名称 (Model ID)</label>
+            <input type="text" id="trans-model-name" class="form-input" placeholder="如: deepseek-chat, gpt-4o-mini" />
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-primary btn-sm" id="btn-save-trans-config">保存接口配置</button>
+            <button class="btn-secondary btn-sm" id="btn-test-trans-api">测试接口连通性</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Translation Workspace -->
+      <div class="action-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div class="action-box-title" style="margin-bottom: 0;">翻译工作台</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 12px; color: var(--text-muted);">目标语言:</label>
+            <select id="trans-target-lang" class="form-input" style="width: auto; margin-bottom: 0; padding: 4px 8px; font-size: 12px;">
+              <option value="ja">日文 (日本語)</option>
+              <option value="zh">中文 (简体中文)</option>
+              <option value="en">英文 (English)</option>
+              <option value="ko">韩文 (한국어)</option>
+            </select>
+          </div>
+        </div>
+
+        <textarea id="trans-input" class="form-input" style="height: 90px; resize: vertical;" placeholder="输入中文、日文或任意句子（如：傲娇、中二病、天然呆、今天天气真好...）"></textarea>
+
+        <button class="btn-primary" id="btn-do-trans">立即执行高保真翻译</button>
+
+        <!-- Quick ACG Chips -->
+        <div style="margin-top: 10px;">
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">萌系速查词库 (点击即查):</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <span class="badge acg-chip" style="cursor: pointer;">傲娇</span>
+            <span class="badge acg-chip" style="cursor: pointer;">病娇</span>
+            <span class="badge acg-chip" style="cursor: pointer;">中二病</span>
+            <span class="badge acg-chip" style="cursor: pointer;">天然呆</span>
+            <span class="badge acg-chip" style="cursor: pointer;">黑化</span>
+            <span class="badge acg-chip" style="cursor: pointer;">幼驯染</span>
+            <span class="badge acg-chip" style="cursor: pointer;">生肉</span>
+            <span class="badge acg-chip" style="cursor: pointer;">熟肉</span>
+            <span class="badge acg-chip" style="cursor: pointer;">同人志</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result Card -->
+      <div class="action-box">
+        <div class="action-box-title" style="justify-content: space-between;">
+          <span>翻译结果</span>
+          <button class="btn-secondary btn-sm" id="btn-copy-trans-result">复制译文</button>
+        </div>
+        <textarea id="trans-output" class="form-input" style="height: 100px; resize: vertical;" readonly placeholder="翻译结果将实时渲染呈现于此..."></textarea>
+      </div>
+    </section>
+
+    <!-- Panel 5: NCM Decryptor -->
+    <section class="tool-view-panel" id="panel-ncm_decryptor">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">网易云 NCM 解密</span>
+        <span></span>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">选择 .ncm 加密音乐</div>
+        <div class="dropzone" id="ncm-dropzone">
+          <div class="dropzone-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <div class="dropzone-text">点击选择或拖放 .ncm 文件</div>
+          <div class="dropzone-hint">采用纯前端 AES+RC4 逆向解密，不消耗流量</div>
+        </div>
+        <input type="file" id="ncm-file-input" accept=".ncm" multiple style="display: none;" />
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">已解密曲目列表</div>
+        <div class="item-list" id="ncm-result-list">
+          <div style="text-align: center; font-size: 12px; color: var(--text-muted); padding: 12px;">暂无解密曲目</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 6: Image Master -->
+    <section class="tool-view-panel" id="panel-image_master">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">图片批处理工坊</span>
+        <span></span>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">选择待处理图片</div>
+        <div class="dropzone" id="img-dropzone">
+          <div class="dropzone-text">点击选择目标图片</div>
+          <div class="dropzone-hint">支持 PNG, JPG, WEBP, BMP, GIF</div>
+        </div>
+        <input type="file" id="img-file-input" accept="image/*" style="display: none;" />
+        <img id="img-preview" style="max-width: 100%; max-height: 160px; border-radius: 8px; margin: 0 auto 10px; display: none;" />
+
+        <label class="form-label">目标格式</label>
+        <select id="img-target-format" class="form-input">
+          <option value="image/png">PNG (透明无损)</option>
+          <option value="image/jpeg">JPEG (白底防黑边)</option>
+          <option value="image/webp">WEBP (超高压缩率)</option>
+        </select>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <button class="btn-primary" id="btn-process-square">1:1 正方形头像</button>
+          <button class="btn-secondary" id="btn-process-scale">格式转换导出</button>
+        </div>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">输出记录</div>
+        <div class="item-list" id="img-result-container"></div>
+      </div>
+    </section>
+
+    <!-- Panel 7: osu!mania Skin Studio -->
+    <section class="tool-view-panel" id="panel-osu_skin_studio">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">osu!mania 皮肤调校工作台</span>
+        <span></span>
+      </div>
+
+      <div style="background: var(--bg-card); border-radius: var(--radius-md); padding: 10px; margin-bottom: 12px; text-align: center; border: 1px solid var(--border-subtle);">
+        <canvas id="maniaCanvas" width="300" height="380" style="max-width: 100%; border-radius: var(--radius-sm);"></canvas>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">舞台参数配置</div>
+        <div style="margin-bottom: 12px;">
+          <div class="slider-control-row">
+            <span>判定线位置 (HitPosition)</span>
+            <span id="val-hit-pos" class="slider-val-badge">400</span>
+          </div>
+          <input type="range" id="slider-hit-pos" min="200" max="410" value="400" />
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div class="slider-control-row">
+            <span>列宽度 (ColumnWidth)</span>
+            <span id="val-col-width" class="slider-val-badge">50</span>
+          </div>
+          <input type="range" id="slider-col-width" min="30" max="75" value="50" />
+        </div>
+
+        <label class="form-label">键位模式</label>
+        <select id="select-keys" class="form-input">
+          <option value="4">4K 经典模式</option>
+          <option value="7">7K 高阶模式</option>
+        </select>
+
+        <button class="btn-primary" id="btn-export-skin">导出并下载 skin.ini</button>
+      </div>
+    </section>
+
+    <!-- Panel 8: Whiteboard -->
+    <section class="tool-view-panel" id="panel-whiteboard">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">二次元便签白板</span>
+        <span></span>
+      </div>
+
+      <div class="action-box" style="padding: 10px;">
+        <canvas id="whiteboardCanvas" style="width: 100%; height: 320px; border-radius: 8px; background: #12131a;"></canvas>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+          <div style="display: flex; gap: 8px;">
+            <span class="color-chip" data-color="#3b82f6" style="width:24px; height:24px; border-radius:50%; background:#3b82f6; cursor:pointer;"></span>
+            <span class="color-chip" data-color="#10b981" style="width:24px; height:24px; border-radius:50%; background:#10b981; cursor:pointer;"></span>
+            <span class="color-chip" data-color="#f59e0b" style="width:24px; height:24px; border-radius:50%; background:#f59e0b; cursor:pointer;"></span>
+            <span class="color-chip" data-color="#ef4444" style="width:24px; height:24px; border-radius:50%; background:#ef4444; cursor:pointer;"></span>
+            <span class="color-chip" data-color="#ffffff" style="width:24px; height:24px; border-radius:50%; background:#ffffff; cursor:pointer;"></span>
+          </div>
+
+          <div style="display: flex; gap: 6px;">
+            <button class="icon-btn" id="btn-wb-eraser" title="橡皮擦">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 20H7L3 16C2 15 2 13 3 12L13 2L22 11L18 15"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" id="btn-wb-clear" title="清空">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" id="btn-wb-save" title="保存">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 9: File Suite -->
+    <section class="tool-view-panel" id="panel-file_suite">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">文件批量整理</span>
+        <span></span>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">批量重命名规则</div>
+        <input type="text" id="file-suite-prefix" class="form-input" placeholder="前缀 (如: [Chieri]_)" />
+        <input type="text" id="file-suite-suffix" class="form-input" placeholder="后缀 (如: _HD)" />
+        <input type="number" id="file-suite-pad" class="form-input" placeholder="数字补零对齐 (如 2 -> 01, 02)" />
+
+        <button class="btn-primary" id="btn-file-suite-preview">生成示例映射预览</button>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">映射预览结果</div>
+        <div class="item-list" id="file-suite-result"></div>
+      </div>
+    </section>
+
+    <!-- Panel 10: PC Platform Compatibility Matrix (PC跨端特性对齐全景清单) -->
+    <section class="tool-view-panel" id="panel-compatibility_matrix">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">PC跨端特性对齐全景清单</span>
+        <span></span>
+      </div>
+
+      <div class="action-box">
+        <div class="action-box-title">桌面端功能移植与沙盒边界报告</div>
+        <div class="action-box-desc">
+          基于 Android OS 沙盒隔离策略对 PC 桌面端全量功能进行权威对齐梳理，明确标示深度移植、高可用移动平替及系统无法实现项。
+        </div>
+
+        <div class="compat-grid">
+          <!-- Ported 1 -->
+          <div class="compat-row">
+            <div class="compat-info">
+              <div class="compat-title">
+                <span>音频格式转换工坊</span>
+              </div>
+              <div class="compat-desc">支持 MP3/WAV/FLAC/AAC/OGG/M4A 互转、采样率与码率重采样</div>
+            </div>
+            <span class="badge badge-success">深度移植</span>
+          </div>
+
+          <!-- Ported 2 -->
+          <div class="compat-row">
+            <div class="compat-info">
+              <div class="compat-title">
+                <span>B站/YT 媒体收割 (含大会员)</span>
+              </div>
+              <div class="compat-desc">支持 SESSDATA 凭据持久化验证，解析 4K/1080P60/杜比全景声 DASH 音画流</div>
+            </div>
+            <span class="badge badge-success">深度移植</span>
+          </div>
+
+          <!-- Ported 3 -->
+          <div class="compat-row">
+            <div class="compat-info">
+              <div class="compat-title">
+                <span>多格式归档压缩与解压</span>
+              </div>
+              <div class="compat-desc">全面扩展支持 ZIP, TAR, GZ/TGZ, BZ2, 7Z, LZ4 多格式结构浏览与提取</div>
+            </div>
+            <span class="badge badge-success">深度移植</span>
+          </div>
+
+          <!-- Ported 4 -->
+          <div class="compat-row">
+            <div class="compat-info">
+              <div class="compat-title">
+                <span>智能 AI / 二次元翻译</span>
+              </div>
+              <div class="compat-desc">支持自由配置大模型 API (DeepSeek/GPT/Qwen) 与离线萌系词库</div>
+            </div>
+            <span class="badge badge-success">深度移植</span>
+          </div>
+
+          <!-- Ported 5 -->
+          <div class="compat-row">
+            <div class="compat-info">
+              <div class="compat-title">
+                <span>网易云 NCM 解密</span>
+              </div>
+              <div class="compat-desc">纯前端 AES+RC4 逆向解密保留内嵌封面与元数据</div>
+            </div>
+            <span class="badge badge-success">深度移植</span>
+          </div>
+
+          <!-- Alternative 1 -->
+          <div class="compat-row">
+            <div class="compat-info">
+              <div class="compat-title">
+                <span>系统快捷悬浮球</span>
+              </div>
+              <div class="compat-desc">平替 PC 桌面右下角托盘菜单，采用 Android WindowManager 全局悬浮球</div>
+            </div>
+            <span class="badge">移动端平替</span>
+          </div>
+
+          <!-- Alternative 2 -->
+          <div class="compat-row">
+            <div class="compat-info">
+              <div class="compat-title">
+                <span>音频波形切片与截取</span>
+              </div>
+              <div class="compat-desc">基于 Web Audio API 毫秒级重采样切片与 WAV 导出平替 PC pydub 核心</div>
+            </div>
+            <span class="badge">移动端平替</span>
+          </div>
+
+          <!-- Sandbox Restricted 1 -->
+          <div class="compat-row" style="border-left: 3px solid var(--accent-danger);">
+            <div class="compat-info">
+              <div class="compat-title" style="color: var(--accent-danger);">
+                <span>Win32 进程强力查杀 (Force Killer)</span>
+              </div>
+              <div class="compat-desc">
+                ❌ 安卓沙盒限制无法实现。<br />
+                <strong>技术根因:</strong> Android 严格执行 Linux UID 进程沙盒与 SELinux 强制访问控制策略。第三方非 Root 应用仅能杀戮自身进程，系统内核直接拒绝跨 UID 强杀其他应用进程。
+              </div>
+            </div>
+            <span class="badge badge-danger">沙盒无法实现</span>
+          </div>
+
+          <!-- Sandbox Restricted 2 -->
+          <div class="compat-row" style="border-left: 3px solid var(--accent-danger);">
+            <div class="compat-info">
+              <div class="compat-title" style="color: var(--accent-danger);">
+                <span>Windows 注册表 PAC 代理注入</span>
+              </div>
+              <div class="compat-desc">
+                ❌ 安卓沙盒限制无法实现。<br />
+                <strong>技术根因:</strong> Android 无注册表子系统。系统网络代理必须由用户手动在 Wi-Fi 设置中输入，或通过 VpnService 启动虚拟网卡并经系统授权弹窗，无法静默注入 PAC 脚本。
+              </div>
+            </div>
+            <span class="badge badge-danger">沙盒无法实现</span>
+          </div>
+
+          <!-- Sandbox Restricted 3 -->
+          <div class="compat-row" style="border-left: 3px solid var(--accent-danger);">
+            <div class="compat-info">
+              <div class="compat-title" style="color: var(--accent-danger);">
+                <span>桌面级物理键盘钩子与模拟键入</span>
+              </div>
+              <div class="compat-desc">
+                ❌ 安卓沙盒限制无法实现。<br />
+                <strong>技术根因:</strong> Win32 SetWindowsHookEx/SendInput 可全局拦截物理键盘事件。Android 为防御敲击记录器恶意木马，严禁后台全局物理键盘监听，需无障碍辅助服务且受严格权限限制。
+              </div>
+            </div>
+            <span class="badge badge-danger">沙盒无法实现</span>
+          </div>
+
+          <!-- Sandbox Restricted 4 -->
+          <div class="compat-row" style="border-left: 3px solid var(--accent-danger);">
+            <div class="compat-info">
+              <div class="compat-title" style="color: var(--accent-danger);">
+                <span>DirectShow 原生底层录屏</span>
+              </div>
+              <div class="compat-desc">
+                ❌ 安卓沙盒限制无法实现。<br />
+                <strong>技术根因:</strong> DirectShow 与 Desktop Duplication 为 Windows 独占多媒体子系统。Android 移动端录屏必须申请 MediaProjection 交互授权凭据且后台服务功耗限制大。
+              </div>
+            </div>
+            <span class="badge badge-danger">沙盒无法实现</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 11: Settings & Modern UI Customization Center -->
+    <section class="tool-view-panel" id="panel-settings">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">UI 自定义与外观调节中心</span>
+        <span></span>
+      </div>
+
+      <!-- Modern UI Customization Box -->
+      <div class="action-box">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-primary);">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10"></path>
+          </svg>
+          高级自定义外观系统 (即时响应 & 本地持久化)
+        </div>
+
+        <!-- 1. Dark / Light Theme Mode -->
+        <label class="form-label">主题色彩模式</label>
+        <div class="radio-chip-group">
+          <div class="radio-chip active" id="theme-chip-dark" data-theme="dark">深色模式 (Dark)</div>
+          <div class="radio-chip" id="theme-chip-light" data-theme="light">浅色模式 (Light)</div>
+        </div>
+
+        <!-- 2. Card Size Mode -->
+        <label class="form-label">卡片尺寸大小</label>
+        <div class="radio-chip-group">
+          <div class="radio-chip" id="size-chip-compact" data-size="compact">紧凑 Compact</div>
+          <div class="radio-chip active" id="size-chip-standard" data-size="standard">标准 Standard</div>
+          <div class="radio-chip" id="size-chip-comfortable" data-size="comfortable">宽松 Comfortable</div>
+        </div>
+
+        <!-- 3. Surface Opacity Slider -->
+        <div class="slider-control-row">
+          <span>界面与卡片透明度 (Surface Opacity)</span>
+          <span id="label-surface-opacity" class="slider-val-badge">92%</span>
+        </div>
+        <input type="range" id="slider-surface-opacity" min="50" max="100" value="92" />
+
+        <!-- 4. Backdrop Blur Style -->
+        <label class="form-label">毛玻璃 / 亚克力磨砂样式 (Backdrop Blur)</label>
+        <div class="radio-chip-group">
+          <div class="radio-chip" id="blur-chip-none" data-blur="0">无模糊 (0px)</div>
+          <div class="radio-chip" id="blur-chip-subtle" data-blur="8">轻微磨砂 (8px)</div>
+          <div class="radio-chip active" id="blur-chip-deep" data-blur="16">深度磨砂 (16px)</div>
+        </div>
+
+        <button class="btn-secondary" id="btn-reset-ui-prefs" style="margin-top: 6px;">恢复外观默认值</button>
+      </div>
+
+      <!-- Floating Ball System Settings -->
+      <div class="action-box">
+        <div class="action-box-title">手机悬浮交互控制</div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          <div>
+            <div style="font-size: 13px; font-weight: 550; color: var(--text-main);">应用内悬浮球</div>
+            <div style="font-size: 11px; color: var(--text-muted);">随时拖拽贴边，快速唤出快捷悬浮气泡菜单</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="settings-floating-ball-switch" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          <div>
+            <div style="font-size: 13px; font-weight: 550; color: var(--text-main);">全局系统悬浮窗 (应用外常驻)</div>
+            <div style="font-size: 11px; color: var(--text-muted);">需要开启 Android 悬浮窗上层显示权限</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="settings-system-overlay-switch" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Storage & About -->
+      <div class="action-box">
+        <div class="action-box-title">存储与缓存管理</div>
+        <button class="btn-secondary" id="btn-clear-cache">彻底清空本地缓存与配置</button>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 10px; line-height: 1.6;">
+          千绘莉的多功能工具箱 (Chieri Toolbox Mobile) · 深度重构版 v2.6.0<br />
+          原生 Android/Bridge 封装架构 (Kotlin SDK 34 + WebAudio + MediaScanner)
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/lame.min.js"></script>
+  <script src="js/audio_engine.js"></script>
+  <script src="js/media_engine.js"></script>
+  <script src="js/archive_engine.js"></script>
+  <script src="js/translator.js"></script>
+  <script src="js/ncm_engine.js"></script>
+  <script src="js/image_engine.js"></script>
+  <script src="js/osu_engine.js"></script>
+  <script src="js/file_suite.js"></script>
+  <script src="js/whiteboard.js"></script>
+  <script src="js/floating_ball.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

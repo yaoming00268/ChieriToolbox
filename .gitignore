@@ -48,3 +48,17 @@ bin/ffprobe.exe
 
 # Temporary scratch scripts
 scratch/
+
+# Android Build Artifacts & Local Files
+.gradle/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/screenshots/
+*.apk
+*.aab
+
+# Test screenshots and emulator dumps
+app_screenshot_*.png
+emulator_*.png
+test_*.png
