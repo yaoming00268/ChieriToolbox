@@ -246,16 +246,21 @@ class ModelManager:
         return models
 
     def delete_model(self, model_id: str) -> bool:
-        """安全删除本地已下载模型，释放磁盘空间"""
-        local_path = self.get_model_path(model_id)
-        if local_path and os.path.isfile(local_path):
+        """安全删除本地已下载模型，释放磁盘空间（绝不误删外部参考探测目录）"""
+        meta = MODEL_REGISTRY.get(model_id)
+        if not meta:
+            return False
+        models_dir = os.path.abspath(self.get_models_dir())
+        target_path = os.path.abspath(os.path.join(models_dir, meta["filename"]))
+        if os.path.isfile(target_path):
             try:
-                os.remove(local_path)
+                os.remove(target_path)
                 return True
             except Exception as e:
                 print(f"[ModelManager] 删除模型 {model_id} 失败: {e}")
                 return False
         return False
+
 
     def cancel_download(self, model_id: str):
         """取消指定模型的正在下载任务"""

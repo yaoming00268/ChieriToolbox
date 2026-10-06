@@ -10,7 +10,10 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import QApplication
 
 # 确保 QApplication 存在
-app = QApplication.instance() or QApplication(sys.argv)
+app = QApplication.instance()
+if not app:
+    app = QApplication(["--platform", "offscreen"])
+
 
 from toolbox.core.config_manager import ConfigManager, _deep_merge_dict
 from toolbox.core.theme import ThemeManager, THEME_DARK, THEME_LIGHT, THEME_SYSTEM

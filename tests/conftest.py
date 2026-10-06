@@ -11,3 +11,10 @@ if sys.platform == "win32":
             ctypes.CDLL(system_icu)
         except Exception:
             pass
+
+# Ensure global offscreen QApplication instance is initialized early for all headless test runs
+from PySide6.QtWidgets import QApplication
+_app = QApplication.instance()
+if not _app:
+    _app = QApplication(["--platform", "offscreen"])
+

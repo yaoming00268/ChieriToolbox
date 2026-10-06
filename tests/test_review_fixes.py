@@ -13,7 +13,10 @@ from PySide6.QtCore import Qt, QRect
 from PySide6.QtWidgets import QApplication, QWidget
 
 # 确保 QApplication 存在
-app = QApplication.instance() or QApplication(sys.argv)
+app = QApplication.instance()
+if not app:
+    app = QApplication(["--platform", "offscreen"])
+
 
 
 def test_paths_scan_registry_apps_exported():
