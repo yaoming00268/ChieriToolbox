@@ -9,7 +9,7 @@ import subprocess
 import time
 import threading
 import requests
-from typing import Optional, Callable, Tuple, List, Dict
+from typing import Optional, Callable, Tuple, List, Dict, Any
 from PySide6.QtCore import QThread, Signal
 from .api import HEADERS, normalize_cookie, QUALITY_MAP
 
@@ -70,7 +70,9 @@ class MediaDownloadWorker(QThread):
         ffmpeg_path: Optional[str] = None,
         cookie: Optional[str] = None,
         headers: Optional[dict] = None,
-        proxies: Optional[dict] = None
+        proxies: Optional[dict] = None,
+        cid: Optional[Any] = None,
+        download_danmaku: bool = True
     ):
         super().__init__()
         self.video_url = video_url
@@ -83,6 +85,8 @@ class MediaDownloadWorker(QThread):
         self.cookie = normalize_cookie(cookie) if cookie else ""
         self.custom_headers = headers or {}
         self.proxies = proxies
+        self.cid = cid
+        self.download_danmaku = download_danmaku
         self._is_cancelled = False
         self._is_paused = False
         self._pause_event = threading.Event()
@@ -319,6 +323,22 @@ class MediaDownloadWorker(QThread):
                     except Exception:
                         pass
 
+            # 生成同名 ASS 弹幕外挂字幕 (如果启用了弹幕下载且有有效 CID)
+            if not self.audio_only and self.cid and self.download_danmaku:
+                try:
+                    self.log_message.emit(f"[弹幕] 正在拉取 B站弹幕并转换为高精度 ASS 字幕 (CID: {self.cid})...")
+                    from .danmaku_to_ass import fetch_bilibili_danmaku_xml, DanmakuToAssConverter
+                    xml_text = fetch_bilibili_danmaku_xml(self.cid, sessdata=self.cookie)
+                    if xml_text:
+                        ass_path = os.path.splitext(out_mp4)[0] + ".ass"
+                        converter = DanmakuToAssConverter()
+                        ass_content = converter.convert_to_ass(xml_text, title=self.title)
+                        with open(ass_path, "w", encoding="utf-8-sig") as f_ass:
+                            f_ass.write(ass_content)
+                        self.log_message.emit(f"[弹幕] 已成功生成同名外挂字幕: {os.path.basename(ass_path)}")
+                except Exception as e_dm:
+                    self.log_message.emit(f"[警告] 弹幕转换出现异常: {e_dm}")
+
             self.progress_changed.emit(100, "音视频下载合并完成！")
             self.log_message.emit(f"[完成] 成功保存: {out_mp4}")
             download_success = True
@@ -465,7 +485,8 @@ class BatchMediaDownloadWorker(QThread):
         audio_format: str = "mp3",
         ffmpeg_path: Optional[str] = None,
         cookie: Optional[str] = None,
-        skip_existing: bool = True
+        skip_existing: bool = True,
+        download_danmaku: bool = True
     ):
         super().__init__()
         self.api = api
@@ -477,6 +498,7 @@ class BatchMediaDownloadWorker(QThread):
         self.ffmpeg_path = ffmpeg_path or find_ffmpeg_executable()
         self.cookie = normalize_cookie(cookie) if cookie else ""
         self.skip_existing = skip_existing
+        self.download_danmaku = download_danmaku
         self._is_cancelled = False
         self._is_paused = False
         self._pause_event = threading.Event()
@@ -635,7 +657,9 @@ class BatchMediaDownloadWorker(QThread):
                 audio_only=self.audio_only,
                 audio_format=task_audio_fmt,
                 ffmpeg_path=self.ffmpeg_path,
-                cookie=self.cookie
+                cookie=self.cookie,
+                cid=cid,
+                download_danmaku=self.download_danmaku
             )
 
             def _on_item_progress(pct, msg):

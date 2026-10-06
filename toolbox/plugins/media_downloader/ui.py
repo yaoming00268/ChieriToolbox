@@ -367,6 +367,16 @@ class MediaDownloaderWidget(QWidget):
         self.cb_skip_existing.setToolTip("开启后，目标目录已存在的完整文件将自动跳过下载")
         opt_h.addWidget(self.cb_skip_existing)
 
+        self.cb_download_danmaku = QCheckBox("下载弹幕(.ass)")
+        self.cb_download_danmaku.setChecked(True)
+        self.cb_download_danmaku.setToolTip("下载视频时同步获取 B站弹幕流，智能排版防重叠并输出同名 .ass 字幕文件")
+        opt_h.addWidget(self.cb_download_danmaku)
+
+        self.btn_open_danmaku_tool = QPushButton("弹幕转 ASS 工具...")
+        self.btn_open_danmaku_tool.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+        self.btn_open_danmaku_tool.clicked.connect(self._open_danmaku_converter_dialog)
+        opt_h.addWidget(self.btn_open_danmaku_tool)
+
         opt_h.addStretch()
         right_card_layout.addLayout(opt_h)
 
@@ -1283,7 +1293,9 @@ class MediaDownloaderWidget(QWidget):
                 title=full_title,
                 audio_only=audio_only,
                 audio_format=task.get("audio_format") or audio_fmt,
-                cookie=self.api.cookie
+                cookie=self.api.cookie,
+                cid=task.get("cid"),
+                download_danmaku=self.cb_download_danmaku.isChecked()
             )
             self.worker.progress_changed.connect(self._on_download_progress)
             self.worker.log_message.connect(self.txt_log.append)
@@ -1301,7 +1313,8 @@ class MediaDownloaderWidget(QWidget):
                 audio_only=audio_only,
                 audio_format=audio_fmt,
                 cookie=self.api.cookie,
-                skip_existing=skip_existing
+                skip_existing=skip_existing,
+                download_danmaku=self.cb_download_danmaku.isChecked()
             )
             self.worker.progress_changed.connect(self._on_download_progress)
             self.worker.log_message.connect(self.txt_log.append)
@@ -1309,6 +1322,101 @@ class MediaDownloaderWidget(QWidget):
             self.worker.item_finished.connect(self._on_item_finished)
             self.worker.batch_finished.connect(self._on_batch_download_finished)
             self.worker.start()
+
+    def _open_danmaku_converter_dialog(self):
+        from PySide6.QtWidgets import QDialog, QFileDialog, QRadioButton, QButtonGroup
+        from .danmaku_to_ass import convert_danmaku_xml_file, fetch_bilibili_danmaku_xml, DanmakuToAssConverter
+        dlg = QDialog(self)
+        dlg.setWindowTitle("B站弹幕转高精 ASS 字幕转换器")
+        dlg.resize(520, 240)
+        d_layout = QVBoxLayout(dlg)
+        d_layout.setSpacing(12)
+
+        lbl = QLabel("可选择本地已下载的 B站 XML 弹幕文件转换为 ASS，或输入 CID 在线抓取生成:")
+        lbl.setWordWrap(True)
+        d_layout.addWidget(lbl)
+
+        rb_file = QRadioButton("选择本地 XML 弹幕文件")
+        rb_cid = QRadioButton("输入 B站视频 CID 在线转换")
+        rb_file.setChecked(True)
+        bg = QButtonGroup(dlg)
+        bg.addButton(rb_file)
+        bg.addButton(rb_cid)
+        m_row = QHBoxLayout()
+        m_row.addWidget(rb_file)
+        m_row.addWidget(rb_cid)
+        d_layout.addLayout(m_row)
+
+        input_row = QHBoxLayout()
+        le_input = QLineEdit()
+        le_input.setPlaceholderText("请选择 XML 文件路径...")
+        input_row.addWidget(le_input, 1)
+        btn_browse = QPushButton("浏览...")
+        input_row.addWidget(btn_browse)
+        d_layout.addLayout(input_row)
+
+        def _on_mode_toggled():
+            if rb_file.isChecked():
+                le_input.setPlaceholderText("请选择 XML 文件路径...")
+                btn_browse.setVisible(True)
+            else:
+                le_input.setPlaceholderText("请输入纯数字 CID (如 12345678)...")
+                btn_browse.setVisible(False)
+
+        rb_file.toggled.connect(_on_mode_toggled)
+        rb_cid.toggled.connect(_on_mode_toggled)
+
+        def _browse_xml():
+            p, _ = QFileDialog.getOpenFileName(dlg, "选择 XML 弹幕文件", "", "XML Files (*.xml);;All Files (*.*)")
+            if p:
+                le_input.setText(p)
+
+        btn_browse.clicked.connect(_browse_xml)
+
+        btn_convert = QPushButton("立即转换并导出 .ass")
+        btn_convert.setObjectName("primaryBtn")
+        d_layout.addWidget(btn_convert)
+
+        def _do_convert():
+            val = le_input.text().strip()
+            if not val:
+                QMessageBox.warning(dlg, "提示", "请输入有效的文件路径或 CID。")
+                return
+            if rb_file.isChecked():
+                if not os.path.isfile(val):
+                    QMessageBox.warning(dlg, "错误", f"指定的文件不存在: {val}")
+                    return
+                out_ass, _ = QFileDialog.getSaveFileName(dlg, "保存 ASS 字幕文件", os.path.splitext(val)[0] + ".ass", "ASS Subtitles (*.ass)")
+                if not out_ass:
+                    return
+                ok, msg = convert_danmaku_xml_file(val, out_ass)
+                if ok:
+                    QMessageBox.information(dlg, "成功", f"弹幕已成功转换为高精 ASS 字幕！\n{out_ass}")
+                    dlg.accept()
+                else:
+                    QMessageBox.critical(dlg, "失败", f"转换失败: {msg}")
+            else:
+                try:
+                    cid_int = int(val)
+                except ValueError:
+                    QMessageBox.warning(dlg, "错误", "CID 必须为纯数字！")
+                    return
+                out_ass, _ = QFileDialog.getSaveFileName(dlg, "保存 ASS 字幕文件", f"danmaku_{cid_int}.ass", "ASS Subtitles (*.ass)")
+                if not out_ass:
+                    return
+                xml_content = fetch_bilibili_danmaku_xml(cid_int, sessdata=self.api.cookie)
+                if not xml_content:
+                    QMessageBox.critical(dlg, "失败", f"未能从 B站拉取到 CID {cid_int} 的弹幕数据。")
+                    return
+                conv = DanmakuToAssConverter()
+                ass_text = conv.convert_to_ass(xml_content, title=f"CID_{cid_int}")
+                with open(out_ass, "w", encoding="utf-8-sig") as f_out:
+                    f_out.write(ass_text)
+                QMessageBox.information(dlg, "成功", f"弹幕已成功在线抓取并导出为 ASS！\n{out_ass}")
+                dlg.accept()
+
+        btn_convert.clicked.connect(_do_convert)
+        dlg.exec()
 
     def _cancel_download(self):
         if self.worker and self.worker.isRunning():

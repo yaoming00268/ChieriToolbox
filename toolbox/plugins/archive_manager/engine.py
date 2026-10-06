@@ -517,6 +517,7 @@ class ArchiveWorker(QThread):
     """归档操作异步工作线程"""
     finished = Signal(bool, str)
     log_message = Signal(str)
+    password_matched = Signal(str)
 
     def __init__(self, mode: str, **kwargs):
         super().__init__()
@@ -528,6 +529,27 @@ class ArchiveWorker(QThread):
             archive = self.kwargs["archive_path"]
             out_dir = self.kwargs["output_dir"]
             pwd = self.kwargs.get("password")
+            auto_match = self.kwargs.get("auto_match_password", True)
+
+            if not pwd and auto_match:
+                try:
+                    from .password_book import check_archive_encryption_status, auto_match_archive_password
+                    is_enc, _, _ = check_archive_encryption_status(archive)
+                    if is_enc:
+                        self.log_message.emit("[密码本] 检测到归档包含加密内容，正在启用 ACG 密码本快速匹配...")
+                        def _prog(cand, cur, tot):
+                            if cur % 10 == 0 or cur == tot:
+                                self.log_message.emit(f"[密码本] 正在试探密码 ({cur}/{tot})...")
+                        matched = auto_match_archive_password(archive, on_progress=_prog)
+                        if matched:
+                            self.log_message.emit(f"[密码本] 匹配成功！匹配到有效密码: 【{matched}】")
+                            pwd = matched
+                            self.password_matched.emit(matched)
+                        else:
+                            self.log_message.emit("[密码本] 密码本快速试探完毕，未找到匹配密码。")
+                except Exception as e:
+                    self.log_message.emit(f"[密码本] 试探过程异常: {str(e)}")
+
             self.log_message.emit(f"[解压] 正在解压: {os.path.basename(archive)} -> {out_dir}")
             ok, msg = extract_archive(archive, out_dir, pwd)
             self.finished.emit(ok, msg)

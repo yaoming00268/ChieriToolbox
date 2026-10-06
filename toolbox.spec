@@ -89,7 +89,7 @@ if os.path.isdir(pyside_dir):
 # 去重数据文件，避免重复打包条目
 datas = list(dict.fromkeys(datas))
 
-# 4. 排除无用且体积极其庞大的 Qt 模块，精简安装包体积
+# 4. 排除无用且体积极其庞大的 Qt 模块，精简安装包体积并防止 PyQt5 冲突
 excludes = [
     'PySide6.QtWebEngine',
     'PySide6.QtWebEngineCore',
@@ -100,6 +100,12 @@ excludes = [
     'PySide6.QtDesigner',
     'PySide6.QtQml',
     'PySide6.QtQuick',
+    'PyQt5',
+    'PyQt5.QtCore',
+    'PyQt5.QtGui',
+    'PyQt5.QtWidgets',
+    'PyQt5.sip',
+    'PyQt6',
     'tkinter',
     'unittest',
 ]

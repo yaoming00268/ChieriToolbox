@@ -1,17 +1,13 @@
-"""
-工具箱 (Chieri Toolbox)
-统一跨工作区实用工具箱应用
-"""
 import sys
+import os
+import ctypes
+
+# Windows PySide6 DLL compatibility fix: Ensure Windows system icuuc.dll is preloaded
+# to prevent incompatible conda Library/bin/icuuc.dll from shadowing the required runtime.
 if sys.platform == "win32":
-    import os
-    import ctypes
     system_icu = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "icuuc.dll")
     if os.path.exists(system_icu):
         try:
             ctypes.CDLL(system_icu)
         except Exception:
             pass
-
-__version__ = "1.0.0"
-

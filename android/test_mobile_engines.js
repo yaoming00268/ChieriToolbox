@@ -22,6 +22,7 @@ require(path.join(__dirname, "app/src/main/assets/web/js/audio_engine.js"));
 require(path.join(__dirname, "app/src/main/assets/web/js/media_engine.js"));
 require(path.join(__dirname, "app/src/main/assets/web/js/archive_engine.js"));
 require(path.join(__dirname, "app/src/main/assets/web/js/translator.js"));
+require(path.join(__dirname, "app/src/main/assets/web/js/cross_device_engine.js"));
 
 let testsPassed = 0;
 let testsFailed = 0;
@@ -288,6 +289,53 @@ async function main() {
     const res = await TranslatorEngine.testConnection({ provider: "offline" });
     assert.strictEqual(res.ok, true);
     assert(res.output.includes("离线词库模式已就绪"));
+  });
+
+  // 5. CrossDeviceEngine Tests (Local Cloud & Mobile Upscale)
+  console.log("\n--- Testing CrossDeviceEngine (Local Cloud & Remote Upscale) ---");
+
+  runTest("CrossDeviceEngine.setConnectedServer persists connection details", () => {
+    CrossDeviceEngine.setConnectedServer("http://192.168.1.188:8765", "Chieri-PC");
+    assert.strictEqual(CrossDeviceEngine.connectedServerUrl, "http://192.168.1.188:8765");
+    assert.strictEqual(CrossDeviceEngine.connectedHostName, "Chieri-PC");
+    assert.strictEqual(localStorage.getItem("chieri_cloud_server_url"), "http://192.168.1.188:8765");
+    assert.strictEqual(localStorage.getItem("chieri_cloud_hostname"), "Chieri-PC");
+  });
+
+  await runAsyncTest("CrossDeviceEngine.upscaleImageOnPC throws clear error when disconnected", async () => {
+    CrossDeviceEngine.connectedServerUrl = "";
+    let errCaught = false;
+    try {
+      await CrossDeviceEngine.upscaleImageOnPC("data:image/png;base64,AAA");
+    } catch (e) {
+      errCaught = true;
+      assert(e.message.includes("请先连接到同一 Wi-Fi 下的电脑宿主"));
+    }
+    assert.strictEqual(errCaught, true);
+  });
+
+  await runAsyncTest("CrossDeviceEngine.sendFileToPC throws clear error when disconnected", async () => {
+    CrossDeviceEngine.connectedServerUrl = "";
+    let errCaught = false;
+    try {
+      await CrossDeviceEngine.sendFileToPC("AAA", "test.png");
+    } catch (e) {
+      errCaught = true;
+      assert(e.message.includes("请先连接到电脑宿主"));
+    }
+    assert.strictEqual(errCaught, true);
+  });
+
+  await runAsyncTest("CrossDeviceEngine.syncClipboard throws clear error when disconnected", async () => {
+    CrossDeviceEngine.connectedServerUrl = "";
+    let errCaught = false;
+    try {
+      await CrossDeviceEngine.syncClipboard("Hello", "send");
+    } catch (e) {
+      errCaught = true;
+      assert(e.message.includes("请先连接到电脑宿主"));
+    }
+    assert.strictEqual(errCaught, true);
   });
 
   console.log("\n==================================================");

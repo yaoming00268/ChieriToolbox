@@ -62,3 +62,11 @@ android/screenshots/
 app_screenshot_*.png
 emulator_*.png
 test_*.png
+
+# AI Model weights & On-Demand storage (Strict size guard)
+models/
+*.pth
+*.onnx
+*.pt
+*.safetensors
+*.bin

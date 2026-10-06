@@ -1148,6 +1148,206 @@
     });
   }
 
+  // --- Cross Device Upscale & Local Cloud Handlers ---
+  const cloudPcHostInput = document.getElementById("cloud-pc-host");
+  const btnDiscoverPc = document.getElementById("btn-discover-pc");
+  const btnTestPcConn = document.getElementById("btn-test-pc-conn");
+  const cloudConnStatus = document.getElementById("cloud-conn-status");
+  const cloudUpscaleDropzone = document.getElementById("cloud-upscale-dropzone");
+  const cloudUpscaleInput = document.getElementById("cloud-upscale-input");
+  const cloudUpscaleFilename = document.getElementById("cloud-upscale-filename");
+  const cloudUpscaleFileinfo = document.getElementById("cloud-upscale-fileinfo");
+  const cloudUpscaleModel = document.getElementById("cloud-upscale-model");
+  const cloudUpscaleScale = document.getElementById("cloud-upscale-scale");
+  const btnStartCloudUpscale = document.getElementById("btn-start-cloud-upscale");
+  const cloudUpscaleResultBox = document.getElementById("cloud-upscale-result-box");
+  const cloudUpscaleResultImg = document.getElementById("cloud-upscale-result-img");
+  const cloudUpscaleResultInfo = document.getElementById("cloud-upscale-result-info");
+  const btnSaveCloudUpscaleImg = document.getElementById("btn-save-cloud-upscale-img");
+  const btnSelectDropFile = document.getElementById("btn-select-drop-file");
+  const chieriDropFileInput = document.getElementById("chieri-drop-file-input");
+  const btnSyncClipboard = document.getElementById("btn-sync-clipboard");
+
+  let currentUpscaleImageBase64 = null;
+  let currentUpscaleResultBase64 = null;
+
+  // Initialize saved PC host
+  if (cloudPcHostInput && window.CrossDeviceEngine) {
+    if (window.CrossDeviceEngine.connectedServerUrl) {
+      cloudPcHostInput.value = window.CrossDeviceEngine.connectedServerUrl;
+      if (cloudConnStatus) {
+        cloudConnStatus.innerText = `已配置服务器: ${window.CrossDeviceEngine.connectedServerUrl} (${window.CrossDeviceEngine.connectedHostName || "PC"})`;
+        cloudConnStatus.style.color = "var(--accent-success)";
+      }
+    }
+  }
+
+  if (btnDiscoverPc) {
+    btnDiscoverPc.addEventListener("click", async () => {
+      showAppToast("正在通过 UDP 广播与局域网扫描寻找 PC 端...");
+      if (cloudConnStatus) cloudConnStatus.innerText = "状态: 正在探测局域网 PC...";
+      try {
+        const found = await CrossDeviceEngine.discoverPC();
+        if (found && found.length > 0) {
+          const pc = found[0];
+          cloudPcHostInput.value = pc.url;
+          CrossDeviceEngine.setConnectedServer(pc.url, pc.hostname);
+          if (cloudConnStatus) {
+            cloudConnStatus.innerText = `已成功连线 PC: ${pc.hostname} (${pc.url})`;
+            cloudConnStatus.style.color = "var(--accent-success)";
+          }
+          showAppToast(`发现 PC 端: ${pc.hostname}`);
+        } else {
+          if (cloudConnStatus) {
+            cloudConnStatus.innerText = "未搜寻到局域网 PC，请在上方输入框手动指定 IP:端口";
+            cloudConnStatus.style.color = "var(--accent-warning)";
+          }
+          showAppToast("未探测到 PC，请手动输入 IP");
+        }
+      } catch (e) {
+        showAppToast(`发现失败: ${e.message}`);
+      }
+    });
+  }
+
+  if (btnTestPcConn) {
+    btnTestPcConn.addEventListener("click", async () => {
+      const url = cloudPcHostInput ? cloudPcHostInput.value.trim() : "";
+      if (!url) {
+        showAppToast("请输入 PC 端 IP 与端口");
+        return;
+      }
+      showAppToast("正在连接 PC 服务...");
+      const fullUrl = url.startsWith("http") ? url : `http://${url}`;
+      const res = await CrossDeviceEngine.pingServer(fullUrl);
+      if (res.ok) {
+        CrossDeviceEngine.setConnectedServer(fullUrl, res.hostname);
+        if (cloudConnStatus) {
+          cloudConnStatus.innerText = `连线正常: ${res.hostname || "PC"} (Chieri Local Cloud v${res.version || "1.0"})`;
+          cloudConnStatus.style.color = "var(--accent-success)";
+        }
+        showAppToast(`连接成功: ${res.hostname || "PC"}`);
+      } else {
+        if (cloudConnStatus) {
+          cloudConnStatus.innerText = `连接失败: ${res.error}`;
+          cloudConnStatus.style.color = "var(--accent-danger)";
+        }
+        showAppToast(`连接失败: ${res.error}`);
+      }
+    });
+  }
+
+  if (cloudUpscaleDropzone && cloudUpscaleInput) {
+    cloudUpscaleDropzone.addEventListener("click", () => cloudUpscaleInput.click());
+    cloudUpscaleInput.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      cloudUpscaleFilename.innerText = file.name;
+      cloudUpscaleFileinfo.innerText = `${(file.size / 1024).toFixed(1)} KB · ${file.type || "图像"}`;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        currentUpscaleImageBase64 = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (btnStartCloudUpscale) {
+    btnStartCloudUpscale.addEventListener("click", async () => {
+      if (!currentUpscaleImageBase64) {
+        showAppToast("请先选择待超分的图像文件！");
+        return;
+      }
+      const model = cloudUpscaleModel ? cloudUpscaleModel.value : "real-cugan";
+      const scale = cloudUpscaleScale ? parseInt(cloudUpscaleScale.value, 10) : 4;
+
+      btnStartCloudUpscale.disabled = true;
+      btnStartCloudUpscale.innerText = "正在投送至电脑端并执行超分...";
+      showAppToast("已提交任务至 PC 端，请稍候...");
+
+      try {
+        const res = await CrossDeviceEngine.upscaleImageOnPC(currentUpscaleImageBase64, {
+          model: model,
+          scale: scale
+        });
+
+        currentUpscaleResultBase64 = res.previewBase64;
+        if (cloudUpscaleResultBox && cloudUpscaleResultImg) {
+          cloudUpscaleResultImg.src = res.previewBase64;
+          cloudUpscaleResultBox.style.display = "block";
+          if (cloudUpscaleResultInfo) {
+            cloudUpscaleResultInfo.innerText = `超分成功！倍率: ${scale}x · 模型: ${model} · 耗时: ${res.costTime || "完成"}`;
+          }
+        }
+        showAppToast("电脑端 AI 超分已顺利完成！");
+      } catch (err) {
+        showAppToast(`超分失败: ${err.message}`);
+      } finally {
+        btnStartCloudUpscale.disabled = false;
+        btnStartCloudUpscale.innerText = "发送至 PC 端执行 AI 超分";
+      }
+    });
+  }
+
+  if (btnSaveCloudUpscaleImg) {
+    btnSaveCloudUpscaleImg.addEventListener("click", () => {
+      if (!currentUpscaleResultBase64) return;
+      if (window.AndroidBridge && window.AndroidBridge.saveImageToGallery) {
+        const ok = window.AndroidBridge.saveImageToGallery(currentUpscaleResultBase64, `chieri_upscale_${Date.now()}.png`);
+        if (ok) showAppToast("高清超分图像已保存至手机相册");
+        else showAppToast("保存失败，请检查存储权限");
+      } else {
+        const a = document.createElement("a");
+        a.href = currentUpscaleResultBase64;
+        a.download = `chieri_upscale_${Date.now()}.png`;
+        a.click();
+        showAppToast("超分图像下载已启动");
+      }
+    });
+  }
+
+  if (btnSelectDropFile && chieriDropFileInput) {
+    btnSelectDropFile.addEventListener("click", () => chieriDropFileInput.click());
+    chieriDropFileInput.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      showAppToast(`正在投送 ${file.name} 到电脑...`);
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const res = await CrossDeviceEngine.sendFileToPC(evt.target.result, file.name);
+          if (res.ok) showAppToast(`文件 ${file.name} 已成功接收至 PC 端！`);
+          else showAppToast(`投送失败: ${res.error}`);
+        } catch (err) {
+          showAppToast(`投送异常: ${err.message}`);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (btnSyncClipboard) {
+    btnSyncClipboard.addEventListener("click", async () => {
+      try {
+        let text = "";
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          text = await navigator.clipboard.readText();
+        }
+        if (!text) {
+          showAppToast("剪贴板中没有可同步的纯文本内容");
+          return;
+        }
+        showAppToast("正在向 PC 同步剪贴板...");
+        const res = await CrossDeviceEngine.syncClipboard(text, "send");
+        if (res.ok) showAppToast("手机剪贴板已秒级同步至 PC 端！");
+        else showAppToast(`剪贴板同步失败: ${res.error}`);
+      } catch (err) {
+        showAppToast(`同步异常: ${err.message}`);
+      }
+    });
+  }
+
   // --- Verification Helpers for Automated UI Testing ---
   window.__loadTestAudioAndConvert = async function(targetFormat = "mp3") {
     try {

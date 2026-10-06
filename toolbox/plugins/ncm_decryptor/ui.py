@@ -37,14 +37,14 @@ class NcmDecryptorWidget(QWidget):
         header_layout.setSpacing(10)
 
         icon_lbl = QLabel()
-        icon_lbl.setPixmap(get_pixmap("lock", color="#f59e0b", size=26))
+        icon_lbl.setPixmap(get_pixmap("music", color="#f59e0b", size=26))
         header_layout.addWidget(icon_lbl)
 
-        title_lbl = QLabel("网易云音乐 NCM 格式解密还原")
+        title_lbl = QLabel("全平台音乐加密格式还原 (NCM / QMC / KGM / KWM)")
         title_lbl.setStyleSheet("font-size: 18px; font-weight: bold;")
         header_layout.addWidget(title_lbl)
 
-        badge_lbl = QLabel("纯算法秒级解密 · 自动恢复封面")
+        badge_lbl = QLabel("网易云 · QQ音乐 · 酷狗 · 酷我 · 秒级无损还原")
         badge_lbl.setFixedHeight(22)
         badge_lbl.setStyleSheet(
             "background-color: #f59e0b; color: #ffffff; border-radius: 9px; "
@@ -57,8 +57,8 @@ class NcmDecryptorWidget(QWidget):
 
         # 2. 核心文件拖拽列表
         self.fl_ncms = ModernFileListWidget(
-            title="待解密 NCM 文件列表",
-            hint="可拖入任意网易云音乐下载的 .ncm 文件或包含 ncm 的文件夹"
+            title="待解密音频文件列表",
+            hint="支持拖入网易云 (.ncm)、QQ音乐 (.qmc0/.qmc3/.qmcflac/.qmcogg/.mflac/.mgg)、酷狗 (.kgm/.vpr)、酷我 (.kwm) 文件或文件夹"
         )
         layout.addWidget(self.fl_ncms, 1)
 
@@ -76,7 +76,7 @@ class NcmDecryptorWidget(QWidget):
         dir_layout.setSpacing(10)
 
         self.btn_group_dir = QButtonGroup(self)
-        self.rb_same_dir = QRadioButton("保存在原 NCM 文件所在目录")
+        self.rb_same_dir = QRadioButton("保存在原音频所在目录")
         self.rb_same_dir.setChecked(True)
         self.rb_custom_dir = QRadioButton("保存在指定目录:")
         self.btn_group_dir.addButton(self.rb_same_dir)
@@ -170,12 +170,12 @@ class NcmDecryptorWidget(QWidget):
     def _start_decryption(self):
         raw_paths = self.fl_ncms.get_paths()
         if not raw_paths:
-            self._log("[提示] 请先添加待解密的 .ncm 文件。")
+            self._log("[提示] 请先添加待解密的音乐文件。")
             return
 
         valid_ncms = scan_ncm_files(raw_paths)
         if not valid_ncms:
-            self._log("[提示] 列表中未包含有效的 .ncm 文件。")
+            self._log("[提示] 列表中未包含支持的加密音频文件 (.ncm, .qmc, .kgm, .kwm 等)。")
             return
 
         custom_dir = None

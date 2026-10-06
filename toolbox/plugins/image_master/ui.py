@@ -3,6 +3,7 @@
 """
 
 import os
+from typing import Optional, List, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
@@ -14,13 +15,17 @@ from toolbox.core.config_manager import ConfigManager
 from toolbox.ui.components.drag_drop_box import ModernFileListWidget
 from .converter import SUPPORTED_FORMATS
 from .resizer import ImageBatchWorker
+from .upscale_engine import SuperResolutionBatchWorker
+from toolbox.core.model_manager import ModelManager
+from toolbox.ui.components.model_manager_widget import ModelManagerDialog
 
 
 class ImageMasterWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.config = ConfigManager()
-        self.worker: ImageBatchWorker = None
+        self.worker = None
+        self.upscale_worker: Optional[SuperResolutionBatchWorker] = None
         self.init_ui()
         self.load_settings()
 
@@ -54,6 +59,7 @@ class ImageMasterWidget(QWidget):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._create_convert_tab(), "格式批量转换")
         self.tabs.addTab(self._create_resize_tab(), "尺寸批量缩放")
+        self.tabs.addTab(self._create_upscale_tab(), "AI 动漫超分辨率")
         top_h_layout.addWidget(self.tabs, 1)
 
         main_layout.addLayout(top_h_layout, 1)
@@ -200,6 +206,98 @@ class ImageMasterWidget(QWidget):
         layout.addStretch()
         return widget
 
+    def _create_upscale_tab(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        # 1. 模型选择与管理
+        m_layout = QHBoxLayout()
+        m_layout.addWidget(QLabel("超分模型:"))
+        self.combo_upscale_model = QComboBox()
+        self.combo_upscale_model.addItem("Real-ESRGAN AnimeVideo-v3 (极速二次元模型)", "realesr-animevideov3")
+        self.combo_upscale_model.addItem("Real-ESRGAN Anime-6B (二次元主力画集模型)", "anime_6B")
+        self.combo_upscale_model.addItem("Real-CUGAN 2x 保守版 (保留原图神韵质感)", "pro-conservative-up2x")
+        self.combo_upscale_model.addItem("Real-CUGAN 2x 无降噪纯净版", "pro-no-denoise-up2x")
+        self.combo_upscale_model.addItem("Real-CUGAN 2x 强力去噪去马赛克", "pro-denoise3x-up2x")
+        self.combo_upscale_model.addItem("Waifu2x CUnet 二次元超分", "waifu2x-cunet")
+        self.combo_upscale_model.currentIndexChanged.connect(self._sync_upscale_model_status)
+        m_layout.addWidget(self.combo_upscale_model, 1)
+
+        self.btn_open_model_hub = QPushButton("按需下载/管理权重...")
+        self.btn_open_model_hub.setStyleSheet("""
+            QPushButton {
+                background-color: #0284c7; color: white; border-radius: 4px;
+                padding: 4px 10px; font-size: 11px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #0369a1; }
+        """)
+        self.btn_open_model_hub.clicked.connect(self._open_model_manager_dialog)
+        m_layout.addWidget(self.btn_open_model_hub)
+        layout.addLayout(m_layout)
+
+        # 本地就绪状态提示
+        self.lbl_upscale_model_status = QLabel()
+        self.lbl_upscale_model_status.setStyleSheet("font-size: 11px;")
+        layout.addWidget(self.lbl_upscale_model_status)
+        self._sync_upscale_model_status()
+
+        # 2. 放大倍率
+        scale_layout = QHBoxLayout()
+        scale_layout.addWidget(QLabel("超分倍率:"))
+        self.combo_scale = QComboBox()
+        self.combo_scale.addItem("2x 放大 (推荐/兼顾速度与质量)", 2)
+        self.combo_scale.addItem("3x 放大", 3)
+        self.combo_scale.addItem("4x 极致超分", 4)
+        scale_layout.addWidget(self.combo_scale)
+        scale_layout.addStretch()
+        layout.addLayout(scale_layout)
+
+        # 3. 切块大小与降噪
+        t_layout = QHBoxLayout()
+        t_layout.addWidget(QLabel("动态切块尺寸:"))
+        self.combo_block_size = QComboBox()
+        self.combo_block_size.addItem("1000 px (标准/防显存爆仓)", 1000)
+        self.combo_block_size.addItem("500 px (低显存/防 OOM)", 500)
+        self.combo_block_size.addItem("2000 px (高性能大图)", 2000)
+        t_layout.addWidget(self.combo_block_size)
+
+        t_layout.addWidget(QLabel("降噪模式:"))
+        self.combo_denoise = QComboBox()
+        self.combo_denoise.addItem("保守版 (保留原图质感)", "conservative")
+        self.combo_denoise.addItem("纯净无降噪 (线条最锐利)", "no_denoise")
+        self.combo_denoise.addItem("强力去噪 (去除重度马赛克与杂点)", "denoise3x")
+        t_layout.addWidget(self.combo_denoise)
+        t_layout.addStretch()
+        layout.addLayout(t_layout)
+
+        tip = QLabel("<b>超分黑科技</b>：<br>"
+                     "• 严格遵守防体积膨胀：大模型权重按需下载，严禁强塞入安装包；<br>"
+                     "• 独家透明图层保护算法，透明立绘/表情包超分边缘绝不发绿发黑；<br>"
+                     "• 大图自动分块切片推理并无缝边缘羽化混合，杜绝切块拼接撕裂。")
+        tip.setObjectName("helperTipLabel")
+        tip.setWordWrap(True)
+        layout.addWidget(tip)
+        layout.addStretch()
+        return widget
+
+    def _sync_upscale_model_status(self):
+        mid = self.combo_upscale_model.currentData()
+        mm = ModelManager()
+        is_ready = mm.is_model_ready(mid)
+        if is_ready:
+            self.lbl_upscale_model_status.setText("状态: 本地权重已就绪 (Ready)")
+            self.lbl_upscale_model_status.setStyleSheet("color: #22c55e; font-size: 11px;")
+        else:
+            self.lbl_upscale_model_status.setText("状态: 尚未下载该模型权重 (可使用内置动漫重构流水线，或点击右侧按需高速下载)")
+            self.lbl_upscale_model_status.setStyleSheet("color: #f59e0b; font-size: 11px;")
+
+    def _open_model_manager_dialog(self):
+        dlg = ModelManagerDialog(self, category_filter="super_resolution")
+        dlg.exec()
+        self._sync_upscale_model_status()
+
     def _on_resize_mode_toggled(self):
         is_pct = self.rb_pct.isChecked()
         self.box_pct.setVisible(is_pct)
@@ -222,13 +320,44 @@ class ImageMasterWidget(QWidget):
             QMessageBox.warning(self, "提示", "请指定输出保存目录。")
             return
 
-        is_convert_tab = (self.tabs.currentIndex() == 0)
-        task_type = "convert" if is_convert_tab else "resize"
+        cur_tab = self.tabs.currentIndex()
 
         self.btn_start.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.progress_bar.setValue(0)
         self.txt_log.clear()
+
+        # 选项卡 2: AI 超分辨率
+        if cur_tab == 2:
+            model_id = self.combo_upscale_model.currentData()
+            scale = int(self.combo_scale.currentData())
+            block_size = int(self.combo_block_size.currentData())
+            denoise = self.combo_denoise.currentData()
+
+            self.txt_log.append(f"[开始] 启动 AI 动漫超分辨率放大: {len(paths)} 个图片 | 模型: {model_id} | 倍率: {scale}x...")
+            os.makedirs(out_dir, exist_ok=True)
+            tasks = []
+            for p in paths:
+                base, ext = os.path.splitext(os.path.basename(p))
+                target_name = f"{base}_upscale_{scale}x{ext if ext else '.png'}"
+                dst = os.path.join(out_dir, target_name)
+                tasks.append((p, dst))
+
+            self.upscale_worker = SuperResolutionBatchWorker(
+                tasks=tasks,
+                scale=scale,
+                model_id=model_id,
+                block_size=block_size,
+                denoise_level=denoise
+            )
+            self.upscale_worker.progress.connect(self._on_upscale_progress)
+            self.upscale_worker.item_finished.connect(self._on_upscale_item)
+            self.upscale_worker.all_finished.connect(self._on_upscale_finished)
+            self.upscale_worker.start()
+            return
+
+        # 选项卡 0/1: 格式转换与尺寸缩放
+        task_type = "convert" if cur_tab == 0 else "resize"
         self.txt_log.append(f"[开始] 开始执行任务 [{task_type}]，共 {len(paths)} 个图片...")
 
         if self.rb_pct.isChecked():
@@ -258,7 +387,25 @@ class ImageMasterWidget(QWidget):
     def _stop_task(self):
         if self.worker and self.worker.isRunning():
             self.worker.stop()
-            self.btn_stop.setEnabled(False)
+        if self.upscale_worker and self.upscale_worker.isRunning():
+            self.upscale_worker.cancel()
+        self.btn_stop.setEnabled(False)
+
+    def _on_upscale_progress(self, pct: int, msg: str):
+        self.progress_bar.setValue(pct)
+        self.txt_log.append(msg)
+
+    def _on_upscale_item(self, src: str, dst: str, ok: bool):
+        tag = "[√] 成功" if ok else "[×] 失败"
+        self.txt_log.append(f"{tag}: {os.path.basename(src)} -> {os.path.basename(dst)}")
+
+    def _on_upscale_finished(self, results: list):
+        self.btn_start.setEnabled(True)
+        self.btn_stop.setEnabled(False)
+        succ = sum(1 for _, _, ok in results if ok)
+        fail = len(results) - succ
+        self.txt_log.append(f"[完成] AI 超分辨率处理完成！成功: {succ} 个，失败: {fail} 个。")
+        QMessageBox.information(self, "完成", f"AI 超分辨率完成！成功: {succ} 个，失败: {fail} 个。")
 
     def _on_progress(self, current, total):
         pct = int(current / total * 100) if total > 0 else 0
@@ -285,6 +432,14 @@ class ImageMasterWidget(QWidget):
         self.cb_keep_ratio.setChecked(cfg.get("keep_ratio", True))
         if "out_dir" in cfg:
             self.le_out_dir.setText(cfg["out_dir"])
+        if hasattr(self, "combo_upscale_model") and "upscale_model_idx" in cfg:
+            m_idx = cfg["upscale_model_idx"]
+            if 0 <= m_idx < self.combo_upscale_model.count():
+                self.combo_upscale_model.setCurrentIndex(m_idx)
+        if hasattr(self, "combo_scale") and "scale_idx" in cfg:
+            s_idx = cfg["scale_idx"]
+            if 0 <= s_idx < self.combo_scale.count():
+                self.combo_scale.setCurrentIndex(s_idx)
 
     def save_settings(self):
         cfg = {
@@ -295,6 +450,8 @@ class ImageMasterWidget(QWidget):
             "target_w": self.sp_w.value(),
             "target_h": self.sp_h.value(),
             "keep_ratio": self.cb_keep_ratio.isChecked(),
-            "out_dir": self.le_out_dir.text()
+            "out_dir": self.le_out_dir.text(),
+            "upscale_model_idx": self.combo_upscale_model.currentIndex() if hasattr(self, "combo_upscale_model") else 0,
+            "scale_idx": self.combo_scale.currentIndex() if hasattr(self, "combo_scale") else 0
         }
         self.config.set_plugin_config("image_master", cfg)

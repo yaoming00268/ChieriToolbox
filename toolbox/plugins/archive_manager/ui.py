@@ -20,6 +20,8 @@ from toolbox.ui.icons import get_icon, get_pixmap
 from .engine import (
     get_available_engines, list_archive_contents, ArchiveWorker
 )
+from .password_book import AcgPasswordBook, auto_match_archive_password, check_archive_encryption_status
+from .password_dialog import AcgPasswordDialog
 
 
 class ArchiveManagerWidget(QWidget):
@@ -101,17 +103,23 @@ class ArchiveManagerWidget(QWidget):
         out_box.addLayout(dir_row)
 
         pwd_row = QHBoxLayout()
-        pwd_row.addWidget(QLabel("解压密码 (若无则留空):"))
+        pwd_row.addWidget(QLabel("解压密码:"))
         self.le_extract_pwd = QLineEdit()
         self.le_extract_pwd.setEchoMode(QLineEdit.Password)
-        self.le_extract_pwd.setPlaceholderText("如有密码请在此输入...")
+        self.le_extract_pwd.setPlaceholderText("如有密码请在此输入，或留空自动试探...")
         pwd_row.addWidget(self.le_extract_pwd, 1)
 
-        self.cb_show_pwd1 = QCheckBox("显示明文")
+        self.cb_show_pwd1 = QCheckBox("明文")
         self.cb_show_pwd1.toggled.connect(
             lambda c: self.le_extract_pwd.setEchoMode(QLineEdit.Normal if c else QLineEdit.Password)
         )
         pwd_row.addWidget(self.cb_show_pwd1)
+
+        self.btn_pwd_book = QPushButton("ACG 密码本...")
+        self.btn_pwd_book.setIcon(get_icon("key", size=14))
+        self.btn_pwd_book.setToolTip("查看或管理二次元社区常用解压密码与个人历史记忆")
+        self.btn_pwd_book.clicked.connect(self._open_password_dialog)
+        pwd_row.addWidget(self.btn_pwd_book)
 
         btn_preview = QPushButton("预览包内文件")
         btn_preview.setIcon(get_icon("search", size=14))
@@ -119,6 +127,12 @@ class ArchiveManagerWidget(QWidget):
         pwd_row.addWidget(btn_preview)
 
         out_box.addLayout(pwd_row)
+
+        auto_pwd_row = QHBoxLayout()
+        self.cb_auto_pwd = QCheckBox("启用 ACG 密码本智能秒级匹配 (自动试探终点/初音/2dfan等二次元社区高频密码)")
+        self.cb_auto_pwd.setChecked(True)
+        auto_pwd_row.addWidget(self.cb_auto_pwd)
+        out_box.addLayout(auto_pwd_row)
         extract_layout.addWidget(out_group)
 
         # 包内文件预览表格
@@ -258,6 +272,15 @@ class ArchiveManagerWidget(QWidget):
         if chosen:
             self.le_extract_dir.setText(chosen)
 
+    def _open_password_dialog(self):
+        dlg = AcgPasswordDialog(self)
+        dlg.password_selected.connect(self.le_extract_pwd.setText)
+        dlg.exec()
+
+    def _on_password_matched(self, pwd: str):
+        self.le_extract_pwd.setText(pwd)
+        self.log_console.append(f"[密码本] 已自动填入匹配成功的解压密码: 【{pwd}】")
+
     def _preview_archive(self):
         arch = self.le_extract_file.text().strip()
         if not arch or not os.path.isfile(arch):
@@ -265,6 +288,18 @@ class ArchiveManagerWidget(QWidget):
             return
 
         pwd = self.le_extract_pwd.text().strip() or None
+        if not pwd and self.cb_auto_pwd.isChecked():
+            is_enc, _, _ = check_archive_encryption_status(arch)
+            if is_enc:
+                self.lbl_status.setText("正在通过 ACG 密码本快速匹配试探...")
+                matched = auto_match_archive_password(arch)
+                if matched:
+                    pwd = matched
+                    self.le_extract_pwd.setText(matched)
+                    self.log_console.append(f"[密码本] 预览时成功匹配解压密码: 【{matched}】")
+                else:
+                    self.log_console.append("[密码本] 预览未匹配到预设密码，请手动输入密码。")
+
         self.lbl_status.setText("正在读取包内文件结构...")
         items = list_archive_contents(arch, pwd)
 
@@ -296,8 +331,15 @@ class ArchiveManagerWidget(QWidget):
         self.btn_do_extract.setEnabled(False)
         self.lbl_status.setText("解压执行中...")
 
-        self.worker = ArchiveWorker("extract", archive_path=arch, output_dir=out_dir, password=pwd)
+        self.worker = ArchiveWorker(
+            "extract",
+            archive_path=arch,
+            output_dir=out_dir,
+            password=pwd,
+            auto_match_password=self.cb_auto_pwd.isChecked()
+        )
         self.worker.log_message.connect(self.log_console.append)
+        self.worker.password_matched.connect(self._on_password_matched)
         self.worker.finished.connect(self._on_archive_finished)
         self.worker.start()
 
@@ -369,6 +411,10 @@ class ArchiveManagerWidget(QWidget):
         if success:
             self.lbl_status.setText("任务圆满完成！")
             self.log_console.append(f"[完成] {msg}")
+            if self.tabs.currentIndex() == 0:
+                pwd = self.le_extract_pwd.text().strip()
+                if pwd:
+                    AcgPasswordBook().add_password(pwd)
         else:
             self.lbl_status.setText(f"操作失败: {msg}")
             self.log_console.append(f"[失败] {msg}")
@@ -430,12 +476,14 @@ class ArchiveManagerWidget(QWidget):
         self.slider_level.setValue(cfg.get("level", 5))
         if "extract_dir" in cfg:
             self.le_extract_dir.setText(cfg["extract_dir"])
+        self.cb_auto_pwd.setChecked(cfg.get("auto_match_pwd", True))
 
     def save_settings(self):
         cfg = {
             "tab_idx": self.tabs.currentIndex(),
             "comp_fmt_idx": self.combo_comp_fmt.currentIndex(),
             "level": self.slider_level.value(),
-            "extract_dir": self.le_extract_dir.text()
+            "extract_dir": self.le_extract_dir.text(),
+            "auto_match_pwd": self.cb_auto_pwd.isChecked()
         }
         self.config.set_plugin_config("archive_manager", cfg)

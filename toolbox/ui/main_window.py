@@ -190,6 +190,15 @@ class MainWindow(QMainWindow):
         nav_layout.addWidget(self.theme_switch_box)
         self._sync_theme_buttons()
 
+        # 核心：局域网双端互联与模型管理快捷按钮
+        self.btn_cloud = QPushButton()
+        self.btn_cloud.setObjectName("flatIconBtn")
+        self.btn_cloud.setIcon(get_icon("wifi", size=16))
+        self.btn_cloud.setToolTip("千绘莉双端互联 & AI模型管理")
+        self.btn_cloud.setFixedSize(32, 32)
+        self.btn_cloud.clicked.connect(self.open_cloud_dialog)
+        nav_layout.addWidget(self.btn_cloud)
+
         # 核心：设置中心按钮
         self.btn_settings = QPushButton()
         self.btn_settings.setObjectName("flatIconBtn")
@@ -283,6 +292,11 @@ class MainWindow(QMainWindow):
 
     def open_settings_dialog(self):
         dialog = SettingsDialog(self)
+        dialog.exec()
+
+    def open_cloud_dialog(self):
+        dialog = SettingsDialog(self)
+        dialog.tabs.setCurrentIndex(5)
         dialog.exec()
 
     _open_settings_dialog = open_settings_dialog

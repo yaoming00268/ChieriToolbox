@@ -811,6 +811,204 @@ class WebAppInterface(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun discoverLocalCloudPC(): String {
+        val results = JSONArray()
+        try {
+            val socket = java.net.DatagramSocket()
+            socket.broadcast = true
+            socket.soTimeout = 1200
+            val reqData = "CHIERI_DISCOVER_REQ".toByteArray(StandardCharsets.UTF_8)
+            val packet = java.net.DatagramPacket(
+                reqData, reqData.size,
+                java.net.InetAddress.getByName("255.255.255.255"), 23333
+            )
+            socket.send(packet)
+
+            val buf = ByteArray(1024)
+            val respPacket = java.net.DatagramPacket(buf, buf.size)
+            val startTime = System.currentTimeMillis()
+            while (System.currentTimeMillis() - startTime < 1200) {
+                try {
+                    socket.receive(respPacket)
+                    val respStr = String(respPacket.data, 0, respPacket.length, StandardCharsets.UTF_8).trim()
+                    if (respStr.startsWith("CHIERI_DISCOVER_RESP:")) {
+                        val parts = respStr.split(":")
+                        val port = if (parts.size >= 2) parts[1].toIntOrNull() ?: 8765 else 8765
+                        val host = if (parts.size >= 3) parts[2] else "Desktop"
+                        val ip = respPacket.address.hostAddress ?: ""
+                        val item = JSONObject()
+                        item.put("ip", ip)
+                        item.put("port", port)
+                        item.put("hostname", host)
+                        item.put("url", "http://$ip:$port")
+                        results.put(item)
+                    }
+                } catch (_: java.net.SocketTimeoutException) {
+                    break
+                }
+            }
+            socket.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return results.toString()
+    }
+
+    @JavascriptInterface
+    fun uploadImageForCloudUpscale(
+        serverUrl: String,
+        imageBase64: String,
+        model: String,
+        scale: Int,
+        denoise: String
+    ): String {
+        val result = JSONObject()
+        try {
+            val cleanBase64 = if (imageBase64.contains(",")) imageBase64.substringAfter(",") else imageBase64
+            val imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
+
+            val url = URL("${serverUrl.trimEnd('/')}/api/upscale")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 15000
+            conn.readTimeout = 180000
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "image/png")
+            conn.setRequestProperty("X-Model", model)
+            conn.setRequestProperty("X-Scale", scale.toString())
+            conn.setRequestProperty("X-Denoise", denoise)
+            conn.setFixedLengthStreamingMode(imageBytes.size)
+
+            conn.outputStream.use { os ->
+                os.write(imageBytes)
+                os.flush()
+            }
+
+            val statusCode = conn.responseCode
+            if (statusCode == 200) {
+                val outBytes = conn.inputStream.use { it.readBytes() }
+                val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                val targetDir = File(picturesDir, "ChieriToolbox")
+                if (!targetDir.exists()) targetDir.mkdirs()
+
+                val filename = "upscale_${scale}x_${System.currentTimeMillis()}.png"
+                val outFile = File(targetDir, filename)
+                outFile.outputStream().use { it.write(outBytes) }
+
+                try {
+                    MediaScannerConnection.scanFile(
+                        activity,
+                        arrayOf(outFile.absolutePath),
+                        arrayOf("image/png"),
+                        null
+                    )
+                } catch (_: Exception) {}
+
+                val base64Preview = Base64.encodeToString(outBytes, Base64.NO_WRAP)
+                result.put("ok", true)
+                result.put("path", outFile.absolutePath)
+                result.put("filename", filename)
+                result.put("previewBase64", "data:image/png;base64,$base64Preview")
+                result.put("costTime", conn.getHeaderField("X-Process-Time") ?: "")
+                showToast("云端超分成功！已保存至相册: $filename")
+            } else {
+                val errStr = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $statusCode"
+                result.put("ok", false)
+                result.put("error", "电脑端处理失败: $errStr")
+                showToast("电脑端超分失败: $statusCode")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            result.put("ok", false)
+            result.put("error", e.message ?: e.toString())
+            showToast("连接电脑宿主异常: ${e.message}")
+        }
+        return result.toString()
+    }
+
+    @JavascriptInterface
+    fun sendDropFileToPC(serverUrl: String, base64Data: String, filename: String): String {
+        val result = JSONObject()
+        try {
+            val cleanBase64 = if (base64Data.contains(",")) base64Data.substringAfter(",") else base64Data
+            val dataBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
+
+            val encName = java.net.URLEncoder.encode(filename, "UTF-8")
+            val url = URL("${serverUrl.trimEnd('/')}/api/drop/send")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 10000
+            conn.readTimeout = 60000
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/octet-stream")
+            conn.setRequestProperty("X-Filename", encName)
+            conn.setFixedLengthStreamingMode(dataBytes.size)
+
+            conn.outputStream.use { os ->
+                os.write(dataBytes)
+                os.flush()
+            }
+
+            val statusCode = conn.responseCode
+            val respBody = (if (statusCode in 200..299) conn.inputStream else conn.errorStream)
+                ?.bufferedReader()?.use { it.readText() } ?: ""
+
+            if (statusCode == 200) {
+                result.put("ok", true)
+                result.put("message", "已成功通过 Chieri Drop 投送至电脑！")
+                showToast("文件已投送至电脑！")
+            } else {
+                result.put("ok", false)
+                result.put("error", respBody)
+                showToast("投送失败: HTTP $statusCode")
+            }
+        } catch (e: Exception) {
+            result.put("ok", false)
+            result.put("error", e.message ?: e.toString())
+            showToast("投送异常: ${e.message}")
+        }
+        return result.toString()
+    }
+
+    @JavascriptInterface
+    fun syncClipboardWithPC(serverUrl: String, text: String, mode: String): String {
+        val result = JSONObject()
+        try {
+            val url = URL("${serverUrl.trimEnd('/')}/api/clipboard")
+            val conn = url.openConnection() as HttpURLConnection
+            if (mode == "send") {
+                conn.requestMethod = "POST"
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                val postJson = JSONObject()
+                postJson.put("text", text)
+                val body = postJson.toString().toByteArray(StandardCharsets.UTF_8)
+                conn.outputStream.use { it.write(body) }
+                val code = conn.responseCode
+                result.put("ok", code == 200)
+                if (code == 200) showToast("已投送手机剪贴板至电脑！")
+            } else {
+                conn.requestMethod = "GET"
+                val code = conn.responseCode
+                if (code == 200) {
+                    val resp = conn.inputStream.bufferedReader().use { it.readText() }
+                    val j = JSONObject(resp)
+                    val pcText = j.optString("text", "")
+                    result.put("ok", true)
+                    result.put("text", pcText)
+                    showToast("已获取电脑剪贴板内容！")
+                } else {
+                    result.put("ok", false)
+                }
+            }
+        } catch (e: Exception) {
+            result.put("ok", false)
+            result.put("error", e.message ?: e.toString())
+        }
+        return result.toString()
+    }
+
+    @JavascriptInterface
     fun getAppVersion(): String {
         return "2.6.0-Mobile"
     }

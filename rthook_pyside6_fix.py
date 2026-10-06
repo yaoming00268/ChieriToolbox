@@ -6,6 +6,14 @@ import os
 import sys
 
 if sys.platform == "win32":
+    import ctypes
+    system_icu = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "icuuc.dll")
+    if os.path.exists(system_icu):
+        try:
+            ctypes.CDLL(system_icu)
+        except Exception:
+            pass
+
     bundle_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
     app_root = os.path.dirname(os.path.abspath(sys.executable))
 

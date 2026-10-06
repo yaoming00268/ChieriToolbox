@@ -229,6 +229,17 @@
         <span class="menu-badge">矩阵</span>
       </a>
 
+      <a class="menu-item" data-tool="cross_device_upscale">
+        <span class="menu-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </span>
+        <span>双端互联与云超分</span>
+        <span class="menu-badge" style="color: var(--accent-secondary);">LocalCloud</span>
+      </a>
+
       <a class="menu-item" data-tool="settings">
         <span class="menu-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -446,6 +457,20 @@
           <div class="tool-card-title">跨端特性全景清单</div>
           <div class="tool-card-desc">全景梳理桌面端移植进度，清晰标定安卓系统沙盒限制特性与高可用平替</div>
           <div class="tool-card-tag">沙盒边界矩阵</div>
+        </div>
+
+        <!-- Cross Device Upscale & Local Cloud -->
+        <div class="tool-card" data-tool="cross_device_upscale" data-category="system" data-tags="局域网 互联 超分辨率 云端 upscale real-cugan real-esrgan chieri drop 剪贴板">
+          <div class="tool-card-icon" style="color: var(--accent-secondary);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <div class="tool-card-title">双端互联与云超分</div>
+          <div class="tool-card-desc">自动发现局域网 PC 算力，手机选择图片一键卸载至电脑执行 Real-CUGAN/ESRGAN 超分，并支持 Chieri Drop 快传与跨端剪贴板</div>
+          <div class="tool-card-tag" style="color: var(--accent-secondary); background: rgba(59, 130, 246, 0.12);">Local Cloud</div>
         </div>
 
         <!-- Settings & UI Customization Center -->
@@ -1312,6 +1337,117 @@
       </div>
     </section>
 
+    <!-- Panel 12: Cross Device Upscale & Local Cloud (双端互联与云超分) -->
+    <section class="tool-view-panel" id="panel-cross_device_upscale">
+      <div class="panel-header">
+        <button class="panel-back-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>返回仪表盘</span>
+        </button>
+        <span class="panel-title">双端互联与云端 AI 超分</span>
+        <span></span>
+      </div>
+
+      <!-- Connection Box -->
+      <div class="action-box">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-secondary);">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>PC 端 Local Cloud 连接状态</span>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+          <input type="text" id="cloud-pc-host" class="search-input" placeholder="输入 PC 地址 (例如 192.168.1.100:8765)" style="margin: 0; flex: 1;" />
+          <button class="btn-secondary" id="btn-discover-pc" style="white-space: nowrap; padding: 0 12px;">自动发现</button>
+          <button class="btn-secondary" id="btn-test-pc-conn" style="white-space: nowrap; padding: 0 12px;">探测连接</button>
+        </div>
+
+        <div id="cloud-conn-status" style="font-size: 12px; color: var(--text-muted); padding: 8px 12px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          状态: 未连接 (请确保 PC 端已在设置中开启“千绘莉 Local Cloud”服务)
+        </div>
+      </div>
+
+      <!-- Cloud Upscale Box -->
+      <div class="action-box">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-primary);">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>手机图片远程 AI 超分 (Real-CUGAN / Real-ESRGAN)</span>
+        </div>
+
+        <div class="dropzone" id="cloud-upscale-dropzone" style="cursor: pointer;">
+          <input type="file" id="cloud-upscale-input" accept="image/*" style="display: none;" />
+          <div style="text-align: center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-primary); margin-bottom: 8px;">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <div id="cloud-upscale-filename" style="font-size: 13px; font-weight: 550;">点击选择需要超分辨率放大的图片</div>
+            <div id="cloud-upscale-fileinfo" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">支持 PNG / JPG / WebP 等动漫同人或摄影图</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+          <div>
+            <label class="form-label">超分模型</label>
+            <select id="cloud-upscale-model" class="search-input" style="margin: 0; width: 100%;">
+              <option value="real-cugan">Real-CUGAN (二次元动漫推荐)</option>
+              <option value="real-esrgan">Real-ESRGAN (通用/真实降噪)</option>
+              <option value="waifu2x">Waifu2x (轻量快速插值)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">放大倍数</label>
+            <select id="cloud-upscale-scale" class="search-input" style="margin: 0; width: 100%;">
+              <option value="2">2x 倍高清放大</option>
+              <option value="4" selected>4x 倍极致超分</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="btn-start-cloud-upscale" style="margin-top: 14px; width: 100%;">
+          <span>发送至 PC 端执行 AI 超分</span>
+        </button>
+
+        <div id="cloud-upscale-result-box" style="display: none; margin-top: 14px; padding: 12px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-subtle); text-align: center;">
+          <img id="cloud-upscale-result-img" style="max-width: 100%; max-height: 280px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);" />
+          <div id="cloud-upscale-result-info" style="font-size: 12px; color: var(--text-muted); margin: 8px 0;"></div>
+          <button class="btn-secondary" id="btn-save-cloud-upscale-img" style="margin: 0 auto;">保存到手机相册</button>
+        </div>
+      </div>
+
+      <!-- Chieri Drop & Clipboard Box -->
+      <div class="action-box">
+        <div class="action-box-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-success);">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <span>千绘莉快传 (Chieri Drop) 与跨端剪贴板</span>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <input type="file" id="chieri-drop-file-input" style="display: none;" />
+          <button class="btn-secondary" id="btn-select-drop-file" style="flex: 1;">
+            <span>选择文件快传到 PC</span>
+          </button>
+          <button class="btn-secondary" id="btn-sync-clipboard" style="flex: 1;">
+            <span>同步手机剪贴板至 PC</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Toast Notification Container -->
@@ -1328,6 +1464,7 @@
   <script src="js/osu_engine.js"></script>
   <script src="js/file_suite.js"></script>
   <script src="js/whiteboard.js"></script>
+  <script src="js/cross_device_engine.js"></script>
   <script src="js/floating_ball.js"></script>
   <script src="js/app.js"></script>
 </body>

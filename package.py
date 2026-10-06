@@ -39,9 +39,6 @@ from toolbox.core.paths import get_bin_dir
 
 def get_python_executable() -> str:
     """获取具备打包环境依赖的 Python 解释器路径"""
-    venv_py = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe")
-    if os.path.isfile(venv_py):
-        return venv_py
     return sys.executable
 
 

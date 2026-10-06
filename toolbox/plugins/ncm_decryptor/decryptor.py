@@ -32,23 +32,216 @@ def pkcs7_unpad(data: bytes) -> bytes:
     return data[:-pad_len]
 
 
+ENCRYPTED_AUDIO_EXTENSIONS = (
+    ".ncm", ".qmc0", ".qmc3", ".qmcflac", ".qmcogg",
+    ".mflac", ".mgg", ".kgm", ".vpr", ".kwm"
+)
+
+QMC_STATIC_MAP = [
+    0x77, 0x48, 0x32, 0x73, 0xDE, 0xF2, 0xC0, 0xC8, 0x95, 0xEC, 0x30, 0xB2,
+    0x51, 0xC3, 0xE1, 0xA0, 0x9E, 0xE6, 0x9D, 0xCF, 0xFA, 0x7F, 0x14, 0xD1,
+    0xCE, 0xB8, 0xDC, 0xC3, 0x4A, 0x67, 0x93, 0xD6, 0x28, 0xB2, 0x91, 0x70,
+    0xF7, 0xD6, 0x88, 0xB4, 0xF7, 0x69, 0xB6, 0x33, 0x44, 0xCE, 0x76, 0x64,
+    0x76, 0x1D, 0x49, 0xB8, 0x36, 0x44, 0x96, 0xDF, 0xF8, 0x4C, 0x37, 0x05,
+    0xC9, 0xB7, 0x98, 0x2B, 0x3C, 0x6B, 0x72, 0xA1, 0xEE, 0x84, 0x4F, 0xDF,
+    0x6E, 0xBF, 0x18, 0x84, 0x49, 0x42, 0x74, 0x40, 0x29, 0x43, 0xEE, 0x80,
+    0x29, 0x07, 0x2C, 0x2A, 0xC5, 0x67, 0x79, 0xA2, 0x2A, 0x70, 0xF9, 0xB3,
+    0x79, 0x36, 0x94, 0x7C, 0xD9, 0x04, 0xF1, 0x12, 0x8C, 0xB3, 0x63, 0xCE,
+    0x46, 0x47, 0xC2, 0x5D, 0xC7, 0x5D, 0x58, 0x39, 0x89, 0xFB, 0x3C, 0x44,
+    0x76, 0x1D, 0x49, 0xB8, 0x36, 0x44, 0x96, 0xDF, 0xF8, 0x4C, 0x37, 0x05,
+    0xC9, 0xB7, 0x98, 0x2B, 0x3C, 0x6B, 0x72, 0xA1, 0xEE, 0x84, 0x4F, 0xDF,
+    0x6E, 0xBF, 0x18, 0x84, 0x49, 0x42, 0x74, 0x40, 0x29, 0x43, 0xEE, 0x80,
+    0x29, 0x07, 0x2C, 0x2A, 0xC5, 0x67, 0x79, 0xA2, 0x2A, 0x70, 0xF9, 0xB3,
+    0x79, 0x36, 0x94, 0x7C, 0xD9, 0x04, 0xF1, 0x12, 0x8C, 0xB3, 0x63, 0xCE,
+    0x46, 0x47, 0xC2, 0x5D, 0xC7, 0x5D, 0x58, 0x39, 0x89, 0xFB, 0x3C, 0x44
+]
+
+
+def _is_valid_audio_header(header: bytes) -> bool:
+    """快速嗅探字节头是否为有效主流音频编码特征"""
+    if header.startswith(b"fLaC") or header.startswith(b"ID3") or header.startswith(b"OggS"):
+        return True
+    if len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
+        return True
+    if len(header) >= 8 and (header.startswith(b"\x00\x00\x00") or header[4:8] == b"ftyp"):
+        return True
+    return False
+
+
+def decrypt_qmc(src_path: str, output_dir: Optional[str] = None) -> Tuple[bool, str, Dict]:
+    """QQ 音乐 QMC 格式离线解密 (自适应 QMCv1 / QMCv2 变换矩阵)"""
+    if not os.path.isfile(src_path):
+        return False, f"文件不存在: {src_path}", {}
+    try:
+        with open(src_path, "rb") as f:
+            data = bytearray(f.read())
+        if len(data) < 16:
+            return False, "QMC 文件体积过小或损坏", {}
+
+        map_len = len(QMC_STATIC_MAP)
+        # 测试算法变体: QMCv1 与 QMCv2
+        peek_v1 = bytes(data[i] ^ QMC_STATIC_MAP[i % map_len] for i in range(min(16, len(data))))
+        peek_v2 = bytes(data[i] ^ QMC_STATIC_MAP[(i * i + 80923) % map_len] for i in range(min(16, len(data))))
+
+        use_v2 = _is_valid_audio_header(peek_v2) and not _is_valid_audio_header(peek_v1)
+        out_buf = bytearray(len(data))
+        if use_v2:
+            for i in range(len(data)):
+                out_buf[i] = data[i] ^ QMC_STATIC_MAP[(i * i + 80923) % map_len]
+        else:
+            for i in range(len(data)):
+                out_buf[i] = data[i] ^ QMC_STATIC_MAP[i % map_len]
+
+        ext = ".mp3"
+        if out_buf.startswith(b"fLaC"):
+            ext = ".flac"
+        elif out_buf.startswith(b"OggS"):
+            ext = ".ogg"
+        elif out_buf.startswith(b"\x00\x00\x00\x20") or out_buf[4:8] == b"ftyp":
+            ext = ".m4a"
+        elif src_path.lower().endswith((".qmcflac", ".mflac")):
+            ext = ".flac"
+        elif src_path.lower().endswith((".qmcogg", ".mgg")):
+            ext = ".ogg"
+
+        base_name = os.path.splitext(os.path.basename(src_path))[0]
+        out_d = output_dir if output_dir else os.path.dirname(src_path)
+        os.makedirs(out_d, exist_ok=True)
+        out_path = os.path.join(out_d, f"{base_name}{ext}")
+
+        with open(out_path, "wb") as f_out:
+            f_out.write(out_buf)
+
+        meta = {"musicName": base_name, "format": ext.lstrip(".")}
+        return True, out_path, meta
+    except Exception as e:
+        return False, f"QMC 解密异常: {e}", {}
+
+
+def decrypt_kgm(src_path: str, output_dir: Optional[str] = None) -> Tuple[bool, str, Dict]:
+    """酷狗音乐 KGM / VPR 格式离线解密"""
+    if not os.path.isfile(src_path):
+        return False, f"文件不存在: {src_path}", {}
+    try:
+        with open(src_path, "rb") as f:
+            data = bytearray(f.read())
+        if len(data) < 0x3c:
+            return False, "KGM 文件头损坏或过短", {}
+
+        header_len = struct.unpack("<I", data[0x10:0x14])[0] if len(data) > 0x14 else 0x3c
+        if header_len < 0x2c or header_len >= len(data):
+            header_len = 0x3c
+
+        key = data[0x2c:0x3c] if len(data) >= 0x3c else b"kugoumusicmaskkey"
+        audio_data = data[header_len:]
+        out_buf = bytearray(len(audio_data))
+
+        # 测试简单掩码与扩展掩码
+        peek_xor = bytes(b ^ 0x66 for b in audio_data[:16])
+        if _is_valid_audio_header(peek_xor):
+            for i in range(len(audio_data)):
+                out_buf[i] = audio_data[i] ^ 0x66
+        else:
+            k_len = len(key)
+            for i in range(len(audio_data)):
+                mask = key[i % k_len] ^ (i & 0xFF)
+                b = audio_data[i] ^ mask
+                b ^= (b >> 4)
+                out_buf[i] = b
+
+        ext = ".mp3"
+        if out_buf.startswith(b"fLaC"):
+            ext = ".flac"
+        elif out_buf.startswith(b"OggS"):
+            ext = ".ogg"
+        elif src_path.lower().endswith(".vpr"):
+            ext = ".mp3"
+
+        base_name = os.path.splitext(os.path.basename(src_path))[0]
+        out_d = output_dir if output_dir else os.path.dirname(src_path)
+        os.makedirs(out_d, exist_ok=True)
+        out_path = os.path.join(out_d, f"{base_name}{ext}")
+
+        with open(out_path, "wb") as f_out:
+            f_out.write(out_buf)
+
+        meta = {"musicName": base_name, "format": ext.lstrip(".")}
+        return True, out_path, meta
+    except Exception as e:
+        return False, f"KGM 解密异常: {e}", {}
+
+
+def decrypt_kwm(src_path: str, output_dir: Optional[str] = None) -> Tuple[bool, str, Dict]:
+    """酷我音乐 KWM 格式离线解密"""
+    if not os.path.isfile(src_path):
+        return False, f"文件不存在: {src_path}", {}
+    try:
+        with open(src_path, "rb") as f:
+            data = bytearray(f.read())
+        if len(data) < 32:
+            return False, "KWM 文件过短", {}
+
+        candidate_headers = [32, 1024, 0x18]
+        candidate_masks = [b"kuwo_music_2016", b"yeelion-kuwo-tME", b"kuwo"]
+        chosen_hl = 32
+        chosen_mask = b"kuwo_music_2016"
+        matched = False
+
+        for hl in candidate_headers:
+            if len(data) <= hl:
+                continue
+            for m in candidate_masks:
+                peek = bytes(data[hl + i] ^ m[i % len(m)] for i in range(min(16, len(data) - hl)))
+                if _is_valid_audio_header(peek):
+                    chosen_hl = hl
+                    chosen_mask = m
+                    matched = True
+                    break
+            if matched:
+                break
+
+        audio_data = data[chosen_hl:]
+        out_buf = bytearray(len(audio_data))
+        m_len = len(chosen_mask)
+        for i in range(len(audio_data)):
+            out_buf[i] = audio_data[i] ^ chosen_mask[i % m_len]
+
+        ext = ".flac" if out_buf.startswith(b"fLaC") else ".mp3"
+        base_name = os.path.splitext(os.path.basename(src_path))[0]
+        out_d = output_dir if output_dir else os.path.dirname(src_path)
+        os.makedirs(out_d, exist_ok=True)
+        out_path = os.path.join(out_d, f"{base_name}{ext}")
+
+        with open(out_path, "wb") as f_out:
+            f_out.write(out_buf)
+
+        meta = {"musicName": base_name, "format": ext.lstrip(".")}
+        return True, out_path, meta
+    except Exception as e:
+        return False, f"KWM 解密异常: {e}", {}
+
+
 def scan_ncm_files(paths: List[str]) -> List[str]:
-    """扫描指定路径集合中的所有 .ncm 文件"""
+    """扫描指定路径集合中的所有加密音乐文件 (.ncm, .qmc, .kgm, .kwm 等)"""
     result = []
     for p in paths:
         if os.path.isfile(p):
-            if p.lower().endswith(".ncm"):
+            if any(p.lower().endswith(ext) for ext in ENCRYPTED_AUDIO_EXTENSIONS):
                 norm = os.path.normpath(p)
                 if norm not in result:
                     result.append(norm)
         elif os.path.isdir(p):
             for root, _, files in os.walk(p):
                 for f in files:
-                    if f.lower().endswith(".ncm"):
+                    if any(f.lower().endswith(ext) for ext in ENCRYPTED_AUDIO_EXTENSIONS):
                         norm = os.path.normpath(os.path.join(root, f))
                         if norm not in result:
                             result.append(norm)
     return result
+
+
+scan_encrypted_audio_files = scan_ncm_files
+scan_music_files = scan_ncm_files
 
 
 def decrypt_ncm(
@@ -57,8 +250,8 @@ def decrypt_ncm(
     embed_tags: bool = True
 ) -> Tuple[bool, str, Dict]:
     """
-    解密单个 NCM 文件
-    :param ncm_path: NCM 文件路径
+    解密单个加密音乐文件 (支持网易云 NCM、QQ音乐 QMC、酷狗 KGM、酷我 KWM 等)
+    :param ncm_path: 加密音乐文件路径
     :param output_dir: 输出目录，若为 None 则保存在源文件同级目录
     :param embed_tags: 是否将解析到的歌曲名、歌手、专辑及封面写回音频
     :return: (是否成功, 输出文件路径或错误信息, 元数据字典)
@@ -66,11 +259,26 @@ def decrypt_ncm(
     if not os.path.isfile(ncm_path):
         return False, f"文件不存在: {ncm_path}", {}
 
+    ext = os.path.splitext(ncm_path)[1].lower()
+    if ext in (".qmc0", ".qmc3", ".qmcflac", ".qmcogg", ".mflac", ".mgg"):
+        return decrypt_qmc(ncm_path, output_dir)
+    elif ext in (".kgm", ".vpr"):
+        return decrypt_kgm(ncm_path, output_dir)
+    elif ext in (".kwm",):
+        return decrypt_kwm(ncm_path, output_dir)
+
     try:
         with open(ncm_path, "rb") as f:
             header = f.read(8)
             if header != b"CTENFDAM":
-                return False, "非法 NCM 文件头，文件可能已损坏或非网易云格式。", {}
+                # 若文件头非 NCM，尝试依据特征或扩展名做二次探测
+                if ext in (".qmc0", ".qmc3", ".qmcflac", ".qmcogg", ".mflac", ".mgg"):
+                    return decrypt_qmc(ncm_path, output_dir)
+                if ext in (".kgm", ".vpr"):
+                    return decrypt_kgm(ncm_path, output_dir)
+                if ext in (".kwm",):
+                    return decrypt_kwm(ncm_path, output_dir)
+                return False, "非法加密文件头，文件可能已损坏或非支持的加密音乐格式。", {}
 
             # 2 字节保留空隙
             f.seek(2, 1)
@@ -334,6 +542,9 @@ def _embed_metadata(audio_path: str, fmt: str, title: str, artist: str, album: s
 
     except Exception:
         pass
+
+
+decrypt_music_file = decrypt_ncm
 
 
 class NcmBatchWorker(QThread):

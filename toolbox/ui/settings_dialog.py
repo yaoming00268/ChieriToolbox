@@ -109,9 +109,13 @@ class SettingsDialog(QDialog):
         self.tab_visual = self._build_visual_tab()
         self.tabs.addTab(self.tab_visual, "界面视觉与特效")
 
-        # 选项卡 4: 独立应用导出
+        # 选项卡 5: 独立应用导出
         self.tab_export = self._build_export_tab()
         self.tabs.addTab(self.tab_export, "独立应用导出")
+
+        # 选项卡 6: AI模型管理与双端局域网互联
+        self.tab_cloud_models = self._build_cloud_models_tab()
+        self.tabs.addTab(self.tab_cloud_models, "AI模型与双端互联")
 
         main_layout.addWidget(self.tabs, 1)
 
@@ -712,6 +716,86 @@ class SettingsDialog(QDialog):
             self.lbl_export_status.setStyleSheet("color: #ef4444; font-size: 12px;")
             QMessageBox.critical(self, "导出失败", f"导出过程发生异常:\n{err}")
 
+    def _build_cloud_models_tab(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(14)
+
+        from toolbox.core.local_cloud import ChieriLocalCloudService, get_local_ip_addresses
+        from toolbox.ui.components.model_manager_widget import ModelManagerWidget
+
+        self.cloud_service = ChieriLocalCloudService()
+
+        # 1. 局域网服务控制卡片
+        cloud_group = QGroupBox("千绘莉局域网服务 (Chieri Drop & 手机云端超分宿主)")
+        cg_layout = QVBoxLayout(cloud_group)
+        cg_layout.setContentsMargins(14, 14, 14, 14)
+        cg_layout.setSpacing(10)
+
+        c_top = QHBoxLayout()
+        self.lbl_cloud_status = QLabel()
+        self.lbl_cloud_status.setStyleSheet("font-size: 13px; font-weight: bold;")
+        c_top.addWidget(self.lbl_cloud_status, 1)
+
+        self.btn_toggle_cloud = QPushButton()
+        self.btn_toggle_cloud.setFixedHeight(30)
+        self.btn_toggle_cloud.clicked.connect(self._toggle_cloud_service)
+        c_top.addWidget(self.btn_toggle_cloud)
+        cg_layout.addLayout(c_top)
+
+        self.lbl_cloud_ips = QLabel()
+        self.lbl_cloud_ips.setStyleSheet("color: #38bdf8; font-size: 11px;")
+        cg_layout.addWidget(self.lbl_cloud_ips)
+
+        tip_cloud = QLabel(
+            "开启后，手机端连入同一 Wi-Fi 可通过 UDP 自动发现本电脑，"
+            "手机可直接投送超分任务给电脑处理并极速回传相册，支持文件闪传与剪贴板无缝流转。"
+        )
+        tip_cloud.setStyleSheet("color: var(--text-muted, #94a3b8); font-size: 11px;")
+        tip_cloud.setWordWrap(True)
+        cg_layout.addWidget(tip_cloud)
+
+        layout.addWidget(cloud_group)
+
+        # 2. 模型管理卡片
+        model_group = QGroupBox("AI 深度模型按需下载与缓存管理 (防体积膨胀)")
+        mg_layout = QVBoxLayout(model_group)
+        mg_layout.setContentsMargins(10, 10, 10, 10)
+
+        self.model_mgr_widget = ModelManagerWidget(self)
+        mg_layout.addWidget(self.model_mgr_widget)
+
+        layout.addWidget(model_group, 1)
+
+        self._update_cloud_ui_state()
+        return widget
+
+    def _update_cloud_ui_state(self):
+        from toolbox.core.local_cloud import ChieriLocalCloudService
+        cloud = ChieriLocalCloudService()
+        if cloud.is_running:
+            self.lbl_cloud_status.setText("[在线] 局域网服务运行中 (Local Cloud Active)")
+            self.lbl_cloud_status.setStyleSheet("color: #22c55e; font-size: 13px; font-weight: bold;")
+            urls = cloud.get_service_urls()
+            self.lbl_cloud_ips.setText(f"电脑端访问地址: {' | '.join(urls)} (UDP 广播发现端口 23333)")
+            self.btn_toggle_cloud.setText("停止局域网服务")
+            self.btn_toggle_cloud.setStyleSheet("background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border-radius: 4px; padding: 4px 12px; font-weight: bold;")
+        else:
+            self.lbl_cloud_status.setText("[未启动] 局域网服务未启动 (Local Cloud Inactive)")
+            self.lbl_cloud_status.setStyleSheet("color: #94a3b8; font-size: 13px; font-weight: bold;")
+            self.lbl_cloud_ips.setText("点击右侧按钮开启服务，开启后手机即可一键发现此电脑")
+            self.btn_toggle_cloud.setText("启动局域网服务")
+            self.btn_toggle_cloud.setStyleSheet("background-color: #0284c7; color: white; border-radius: 4px; padding: 4px 12px; font-weight: bold;")
+
+    def _toggle_cloud_service(self):
+        from toolbox.core.local_cloud import ChieriLocalCloudService
+        cloud = ChieriLocalCloudService()
+        if cloud.is_running:
+            cloud.stop_service()
+        else:
+            cloud.start_service()
+        self._update_cloud_ui_state()
 
     def load_settings(self):
         """载入当前配置并绑定控件状态"""

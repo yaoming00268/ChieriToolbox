@@ -10,6 +10,15 @@ import subprocess
 import tempfile
 import traceback
 
+if sys.platform == "win32":
+    import ctypes
+    system_icu = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "icuuc.dll")
+    if os.path.exists(system_icu):
+        try:
+            ctypes.CDLL(system_icu)
+        except Exception:
+            pass
+
 # 针对 Windows 窗口模式 (--noconsole) 命令行传参时的控制台控制与流重定向
 if sys.platform == "win32" and len(sys.argv) > 1:
     try:
