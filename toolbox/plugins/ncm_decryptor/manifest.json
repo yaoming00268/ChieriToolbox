@@ -1,0 +1,11 @@
+{
+  "id": "ncm_decryptor",
+  "name": "全能音乐解密工坊",
+  "version": "1.2.0",
+  "author": "Chieri",
+  "category": "音频工具",
+  "description": "纯算法秒级解密网易云 NCM、QQ音乐 QMC/MFLAC/MGG、酷狗 KGM/VPR、酷我 KWM 等主流加密音频格式，自动转换为 MP3/FLAC 并完整恢复 ID3 标签与内嵌封面。",
+  "icon": "unlock",
+  "sort_order": 36,
+  "entry_point": "plugin.py"
+}

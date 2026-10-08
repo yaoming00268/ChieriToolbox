@@ -1,0 +1,11 @@
+{
+  "id": "json_diff_studio",
+  "name": "JSON对比分析工坊",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "效率工具",
+  "description": "JSON/文本双栏高精对比、实时语法美化与紧凑压缩、层级折叠树视图、以及强大零依赖的 JSONPath 查询提取器。",
+  "icon": "git-compare",
+  "sort_order": 45,
+  "entry_point": "plugin.py"
+}

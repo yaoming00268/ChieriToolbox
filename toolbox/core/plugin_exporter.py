@@ -877,3 +877,12 @@ pause
                 "error": str(e),
                 "traceback": traceback.format_exc()
             }
+
+    @staticmethod
+    def export_plugin_cpk(plugin_id: str, output_path_or_dir: str) -> str:
+        """
+        将指定插件导出为符合微内核解耦包规范的标准 .cpk 便携归档包。
+        归档内自动封装 manifest.json、图标、源码模块与相关资源。
+        """
+        pm = PluginManager()
+        return pm.export_plugin_cpk(plugin_id, output_path_or_dir)

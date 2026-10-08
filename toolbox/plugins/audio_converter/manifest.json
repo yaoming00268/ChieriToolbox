@@ -1,0 +1,11 @@
+{
+  "id": "audio_converter",
+  "name": "音频格式批量转换",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "音频工具",
+  "description": "多格式音频批量互转，支持采样率 (44.1k/48k/96k)、声道 (立体声/单声道) 及比特率灵活配置。",
+  "icon": "refresh",
+  "sort_order": 34,
+  "entry_point": "plugin.py"
+}

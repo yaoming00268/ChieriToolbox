@@ -144,8 +144,8 @@ def run_smoke_test(exe_path: Optional[str] = None) -> bool:
                 errors = data.get("errors", [])
                 plugins = data.get("plugins", [])
                 binaries = data.get("binaries", {})
-                print(f"[自检报告解析] 状态: {status} | 插件数: {len(plugins)}/22 | 外部二进制: {list(binaries.keys())} | 错误数: {len(errors)}")
-                if status == "passed" and len(errors) == 0 and len(plugins) >= 22 and proc.returncode == 0:
+                print(f"[自检报告解析] 状态: {status} | 插件数: {len(plugins)}/28 | 外部二进制: {list(binaries.keys())} | 错误数: {len(errors)}")
+                if status == "passed" and len(errors) == 0 and len(plugins) >= 28 and proc.returncode == 0:
                     print("\n=======================================================")
                     print(f" [√] 打包独立可执行文件冒烟测试深度验证全数通过 (PASSED)！共 {len(plugins)} 项插件与新特性完备。")
                     print("=======================================================")
@@ -296,7 +296,9 @@ def build_installer(iss_path: Optional[str] = None, output_dir: Optional[str] = 
 
 def upload_artifacts() -> bool:
     """调用 GitHub Releases 发布脚本上传打包产物 (Setup_ChieriToolbox.exe 和 Portable.zip)"""
-    upload_script = os.path.join(PROJECT_ROOT, "scratch", "upload_release.py")
+    upload_script = os.path.join(PROJECT_ROOT, "scripts", "upload_release.py")
+    if not os.path.isfile(upload_script):
+        upload_script = os.path.join(PROJECT_ROOT, "scratch", "upload_release.py")
     if not os.path.isfile(upload_script):
         print(f"[错误] 未找到上传脚本: {upload_script}")
         return False
@@ -390,14 +392,29 @@ def export_plugin(plugin_id: str, output_dir: Optional[str] = None, compile_setu
         return False
 
 
+def clean_build_artifacts():
+    """清理临时构建缓存与历史目录"""
+    targets = [
+        os.path.join(PROJECT_ROOT, "build"),
+    ]
+    for target in targets:
+        if os.path.exists(target):
+            try:
+                shutil.rmtree(target, ignore_errors=True)
+                print(f"[√] 清理构建缓存目录: {target}")
+            except Exception as e:
+                print(f"[-] 清理目录 {target} 异常: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="千绘莉工具箱统一打包构建工具 (内置 Inno Setup 支持)")
     parser.add_argument("--check-iscc", action="store_true", help="检测并显示 Inno Setup 编译器路径")
+    parser.add_argument("--clean", action="store_true", help="清理构建临时缓存 (build/ 等)")
     parser.add_argument("--all", action="store_true", help="执行完整构建流程 (PyInstaller 打包 -> 冒烟测试 -> 便携 ZIP -> 原生 EXE 安装包)")
-    parser.add_argument("--bundle", action="store_true", help="仅执行 PyInstaller 打包构建 dist/ChieriToolbox")
-    parser.add_argument("--smoke-test", action="store_true", help="仅对已打包的可执行文件执行冒烟深度测试")
-    parser.add_argument("--portable", "--zip", action="store_true", dest="portable", help="仅生成绿色免安装 Portable ZIP 压缩包")
-    parser.add_argument("--installer", action="store_true", help="仅编译主工具箱原生 Inno Setup 安装包")
+    parser.add_argument("--bundle", action="store_true", help="执行 PyInstaller 打包构建 dist/ChieriToolbox")
+    parser.add_argument("--smoke-test", action="store_true", help="对已打包的可执行文件执行冒烟深度测试")
+    parser.add_argument("--portable", "--zip", action="store_true", dest="portable", help="生成绿色免安装 Portable ZIP 压缩包")
+    parser.add_argument("--installer", action="store_true", help="编译主工具箱原生 Inno Setup 安装包")
     parser.add_argument("--upload", action="store_true", help="上传构建产物 (Setup 与 Portable) 至 GitHub Releases")
     parser.add_argument("--iss", type=str, default=None, help="指定的 .iss 脚本路径")
     parser.add_argument("--spec", type=str, default=None, help="指定的 .spec 脚本路径")
@@ -410,6 +427,9 @@ def main():
     if args.check_iscc:
         check_iscc()
         return
+
+    if args.clean:
+        clean_build_artifacts()
 
     if args.plugin:
         ok = export_plugin(args.plugin, output_dir=args.output, compile_setup=True)
@@ -426,29 +446,35 @@ def main():
         print(f"\n[全量导出完成] 成功: {success_cnt}/{len(plugins)}")
         sys.exit(0 if success_cnt == len(plugins) else 1)
 
-    if args.bundle:
-        ok = build_pyinstaller(spec_path=args.spec)
+    has_step = any([args.bundle, args.smoke_test, args.portable, args.installer, args.upload])
+    if args.all or not has_step:
+        ok = build_all(spec_path=args.spec, iss_path=args.iss, do_upload=args.upload)
         sys.exit(0 if ok else 1)
+
+    exe_target = os.path.join(PROJECT_ROOT, "dist", "ChieriToolbox", "ChieriToolbox.exe")
+    need_bundle_first = args.bundle or (args.clean and (args.smoke_test or args.portable or args.installer)) or (not os.path.isfile(exe_target) and (args.smoke_test or args.portable or args.installer))
+
+    if need_bundle_first:
+        if not build_pyinstaller(spec_path=args.spec):
+            sys.exit(1)
 
     if args.smoke_test:
-        ok = run_smoke_test()
-        sys.exit(0 if ok else 1)
+        if not run_smoke_test():
+            sys.exit(1)
 
     if args.portable:
-        ok = build_portable_zip()
-        sys.exit(0 if ok else 1)
+        if not build_portable_zip():
+            sys.exit(1)
 
     if args.installer:
-        ok = build_installer(iss_path=args.iss, output_dir=args.output)
-        sys.exit(0 if ok else 1)
+        if not build_installer(iss_path=args.iss, output_dir=args.output):
+            sys.exit(1)
 
-    if args.upload and not args.all:
-        ok = upload_artifacts()
-        sys.exit(0 if ok else 1)
+    if args.upload:
+        if not upload_artifacts():
+            sys.exit(1)
 
-    # 默认行为或显式指定 --all: 执行全流程一体化构建
-    ok = build_all(spec_path=args.spec, iss_path=args.iss, do_upload=args.upload)
-    sys.exit(0 if ok else 1)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

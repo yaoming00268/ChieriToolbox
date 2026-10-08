@@ -1,0 +1,11 @@
+{
+  "id": "screen_capture",
+  "name": "专业截图工具 (PixPin风)",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "图像工具",
+  "description": "全功能像素级屏幕截图工具，支持矩形选区、智能窗口嗅探、全屏快照、滚动长截图、桌面贴图置顶与快捷键绑定。",
+  "icon": "camera",
+  "sort_order": 21,
+  "entry_point": "plugin.py"
+}

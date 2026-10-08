@@ -50,11 +50,39 @@ class HomePage(QWidget):
 
         self.event_bus.theme_changed.connect(self._on_theme_changed)
         self.event_bus.settings_changed.connect(self._on_settings_changed)
+        self.destroyed.connect(self.cleanup)
+
+    def _clear_card_pool(self):
+        """彻底清理卡片池中所有控件，防止脱落到孤立树中内存泄露"""
+        if hasattr(self, "_card_pool"):
+            for card in list(self._card_pool.values()):
+                try:
+                    card.cleanup()
+                    card.setParent(None)
+                    card.deleteLater()
+                except Exception:
+                    pass
+            self._card_pool.clear()
+
+    def cleanup(self):
+        """断开与全局事件总线的信号连接并清理卡片池，防止内存泄露与失效回调"""
+        if getattr(self, "_is_cleaned_up", False):
+            return
+        self._is_cleaned_up = True
+        try:
+            self.event_bus.theme_changed.disconnect(self._on_theme_changed)
+        except Exception:
+            pass
+        try:
+            self.event_bus.settings_changed.disconnect(self._on_settings_changed)
+        except Exception:
+            pass
+        self._clear_card_pool()
 
     def set_plugins(self, plugins: List[PluginBase]):
         """更新插件列表并刷新渲染"""
         self.plugins = plugins
-        self._card_pool.clear()
+        self._clear_card_pool()
         if getattr(self, "_pending_startup_category", None):
             self.current_category = self._pending_startup_category
             self._pending_startup_category = None

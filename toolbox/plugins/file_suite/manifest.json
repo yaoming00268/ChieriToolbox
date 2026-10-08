@@ -1,0 +1,11 @@
+{
+  "id": "file_suite",
+  "name": "文件批量整理大师",
+  "version": "1.2.0",
+  "author": "Chieri",
+  "category": "文件管理",
+  "description": "强大的文件整理套件：支持文件名批量重命名、正则匹配、后缀名格式统一、子文件夹提取与扁平化清理。",
+  "icon": "folder",
+  "sort_order": 10,
+  "entry_point": "plugin.py"
+}

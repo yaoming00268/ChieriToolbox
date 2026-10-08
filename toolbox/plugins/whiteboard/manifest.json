@@ -1,0 +1,11 @@
+{
+  "id": "whiteboard",
+  "name": "交互式白板 (希沃风)",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "办公辅助",
+  "description": "全功能教学与演示交互白板，支持平滑手写笔、荧光记号笔、图形绘制、橡皮擦除、网格背景切换与历史撤销重做。",
+  "icon": "pencil",
+  "sort_order": 50,
+  "entry_point": "plugin.py"
+}

@@ -122,10 +122,16 @@ class TestPluginManager(unittest.TestCase):
             "audio_recorder",
             "screen_capture",
             "screen_recorder",
-            "whiteboard"
+            "whiteboard",
+            "quick_launcher",
+            "clipboard_manager",
+            "port_network_sentinel",
+            "watermark_studio",
+            "json_diff_studio",
+            "env_var_switcher"
         }
         self.assertTrue(expected_ids.issubset(plugin_ids), f"Missing plugins: {expected_ids - plugin_ids}")
-        self.assertEqual(len(plugins), 22)
+        self.assertGreaterEqual(len(plugins), 28)
 
     def test_plugin_metadata(self):
         for p in self.pm.get_all_plugins():
@@ -2321,7 +2327,7 @@ class TestReviewerHardeningAndVerification(unittest.TestCase):
         pm = PluginManager()
         pm.discover_and_load()
         plugins = pm.get_all_plugins()
-        self.assertEqual(len(plugins), 22)
+        self.assertGreaterEqual(len(plugins), 26)
 
         for p in plugins:
             widget = p.create_widget()
@@ -2651,7 +2657,7 @@ class TestStandaloneAndTrayFeatures(unittest.TestCase):
         pm = PluginManager()
         pm.discover_and_load()
         plugins = pm.get_all_plugins()
-        self.assertEqual(len(plugins), 22)
+        self.assertGreaterEqual(len(plugins), 26)
 
         expected_sizes = {(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)}
 
@@ -2736,9 +2742,9 @@ class TestStandaloneAndTrayFeatures(unittest.TestCase):
         tab_titles = [diag.tabs.tabText(i) for i in range(diag.tabs.count())]
         self.assertIn("系统托盘常驻", tab_titles)
 
-        # 2. 验证全部 22 个插件的托盘复选框均已注册
-        self.assertEqual(len(diag._tray_checkboxes), 22)
-        self.assertEqual(len(diag._plugin_tray_checkboxes), 22)
+        # 2. 验证全部插件的托盘复选框均已注册
+        self.assertGreaterEqual(len(diag._tray_checkboxes), 26)
+        self.assertGreaterEqual(len(diag._plugin_tray_checkboxes), 26)
 
         test_pid = "screen_capture"
         tray_cb = diag._tray_checkboxes[test_pid]

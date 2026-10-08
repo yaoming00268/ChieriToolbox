@@ -1,0 +1,11 @@
+{
+  "id": "image_master",
+  "name": "图像格式转换与缩放工坊",
+  "version": "1.3.0",
+  "author": "Chieri",
+  "category": "图像媒体",
+  "description": "批量图片处理利器：支持常见格式互转 (PNG/JPG/WEBP/ICO等)、透明底色智能填充、高保真尺寸缩放。",
+  "icon": "image",
+  "sort_order": 20,
+  "entry_point": "plugin.py"
+}

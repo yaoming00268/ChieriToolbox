@@ -291,7 +291,35 @@ SVG_PATHS: Dict[str, str] = {
     "power": (
         '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>'
         '<line x1="12" y1="2" x2="12" y2="12"/>'
-    )
+    ),
+    "puzzle": (
+        '<path d="M19.439 7.85c0 0-1.439.15-2.439-1s0-2.85 0-2.85h-3s-.15 1.44-1.15 2.44-2.85 0-2.85 0v-3h-4v4s1.44.15 2.44 1.15 0 2.85 0 2.85h-3v4s1.44.15 2.44 1.15 0 2.85 0 2.85h4v-3s.15-1.44 1.15-2.44 2.85 0 2.85 0v3h3s.15-1.44 1.15-2.44 2.85 0 2.85 0v-4h-3s-1.44-.15-2.44-1.15 0-2.85 0-2.85z"/>'
+    ),
+    "clipboard": (
+        '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>'
+        '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>'
+    ),
+    "git-compare": (
+        '<circle cx="18" cy="18" r="3"/>'
+        '<circle cx="6" cy="6" r="3"/>'
+        '<path d="M13 6h3a2 2 0 0 1 2 2v7"/>'
+        '<path d="M11 18H8a2 2 0 0 1-2-2V9"/>'
+    ),
+    "sliders": (
+        '<line x1="4" x2="4" y1="21" y2="14"/>'
+        '<line x1="4" x2="4" y1="10" y2="3"/>'
+        '<line x1="12" x2="12" y1="21" y2="12"/>'
+        '<line x1="12" x2="12" y1="8" y2="3"/>'
+        '<line x1="20" x2="20" y1="21" y2="16"/>'
+        '<line x1="20" x2="20" y1="12" y2="3"/>'
+        '<line x1="1" x2="7" y1="14" y2="14"/>'
+        '<line x1="9" x2="15" y1="8" y2="8"/>'
+        '<line x1="17" x2="23" y1="16" y2="16"/>'
+    ),
+    "code": (
+        '<polyline points="16 18 22 12 16 6"/>'
+        '<polyline points="8 6 2 12 8 18"/>'
+    ),
 }
 
 # 缓存已生成的 QPixmap 和 QIcon
@@ -531,6 +559,38 @@ PLUGIN_ICON_CONFIG: Dict[str, Dict[str, Any]] = {
         "stroke_color": "#ffffff",
         "stroke_width": 2.0,
     },
+    "quick_launcher": {
+        "symbol": "search",
+        "color_start": "#8b5cf6",
+        "color_end": "#6d28d9",
+        "accent": "#8b5cf6",
+        "stroke_color": "#ffffff",
+        "stroke_width": 2.0,
+    },
+    "clipboard_manager": {
+        "symbol": "clipboard",
+        "color_start": "#0ea5e9",
+        "color_end": "#0284c7",
+        "accent": "#0ea5e9",
+        "stroke_color": "#ffffff",
+        "stroke_width": 2.0,
+    },
+    "port_network_sentinel": {
+        "symbol": "shield",
+        "color_start": "#10b981",
+        "color_end": "#047857",
+        "accent": "#10b981",
+        "stroke_color": "#ffffff",
+        "stroke_width": 2.0,
+    },
+    "watermark_studio": {
+        "symbol": "image",
+        "color_start": "#06b6d4",
+        "color_end": "#0891b2",
+        "accent": "#06b6d4",
+        "stroke_color": "#ffffff",
+        "stroke_width": 2.0,
+    },
 }
 
 _PLUGIN_BADGE_CACHE: Dict[Tuple[str, int], QPixmap] = {}
@@ -615,14 +675,35 @@ def get_plugin_pixmap(plugin_id: str, color: Optional[str] = None, size: int = 2
     return get_pixmap(sym, color=eff_color, size=size)
 
 
-def get_plugin_icon(plugin_id: str, size: int = 24) -> QIcon:
+def get_plugin_icon(plugin_id: str, size: int = 24, plugin_dir: Optional[str] = None) -> QIcon:
     """
     获取指定插件的独立 QIcon。
-    若插件目录下已存在 icon.ico 则直接载入并缓存，否则由徽章渲染器生成。
+    若插件目录下已存在 icon.svg/icon.ico/icon.png 则直接载入并缓存，否则由徽章渲染器生成。
     """
-    cache_key = (plugin_id, size)
+    cache_key = (plugin_id, size, plugin_dir or "")
     if cache_key in _PLUGIN_ICON_CACHE:
         return _PLUGIN_ICON_CACHE[cache_key]
+
+    if plugin_dir and os.path.isdir(plugin_dir):
+        for candidate_name in ("icon.svg", "icon.ico", "icon.png"):
+            cand = os.path.join(plugin_dir, candidate_name)
+            if os.path.isfile(cand):
+                if candidate_name.endswith(".svg"):
+                    renderer = QSvgRenderer(cand)
+                    if renderer.isValid():
+                        pix = QPixmap(size, size)
+                        pix.fill(Qt.transparent)
+                        painter = QPainter(pix)
+                        renderer.render(painter)
+                        painter.end()
+                        icon = QIcon(pix)
+                        _PLUGIN_ICON_CACHE[cache_key] = icon
+                        return icon
+                else:
+                    icon = QIcon(cand)
+                    if not icon.isNull():
+                        _PLUGIN_ICON_CACHE[cache_key] = icon
+                        return icon
 
     from toolbox.core.paths import get_app_root
     cand_ico = os.path.join(get_app_root(), "toolbox", "plugins", plugin_id, "icon.ico")

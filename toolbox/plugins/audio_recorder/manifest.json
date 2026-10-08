@@ -1,0 +1,11 @@
+{
+  "id": "audio_recorder",
+  "name": "高清录音工具",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "音频工具",
+  "description": "麦克风高清音频录制，支持动态波形电平显示、暂停/继续录制、导出 MP3/WAV 格式与历史回放。",
+  "icon": "mic",
+  "sort_order": 34,
+  "entry_point": "plugin.py"
+}

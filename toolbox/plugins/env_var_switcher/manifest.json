@@ -1,0 +1,11 @@
+{
+  "id": "env_var_switcher",
+  "name": "环境变量管家",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "系统增强",
+  "description": "Windows 用户/系统环境变量与 PATH 可视化管理、失效与冗余路径体检、一键备份还原与开发环境预设方案快速切换。",
+  "icon": "sliders",
+  "sort_order": 83,
+  "entry_point": "plugin.py"
+}

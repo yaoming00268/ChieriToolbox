@@ -167,6 +167,12 @@ class SettingsDialog(QDialog):
         btn_deselect_all.clicked.connect(lambda: self._set_all_plugins(False))
         tool_bar.addWidget(btn_deselect_all)
 
+        btn_hub = QPushButton("插件工坊 (随删随装/导入)")
+        btn_hub.setObjectName("primaryBtn")
+        btn_hub.setIcon(get_icon("puzzle", size=14))
+        btn_hub.clicked.connect(self._open_plugin_hub_action)
+        tool_bar.addWidget(btn_hub)
+
         layout.addLayout(tool_bar)
 
         # 滚动列表承载各插件项
@@ -797,10 +803,32 @@ class SettingsDialog(QDialog):
             cloud.start_service()
         self._update_cloud_ui_state()
 
+    def _open_plugin_hub_action(self):
+        """从设置中心打开完整的插件工坊界面"""
+        from toolbox.ui.plugin_hub_dialog import PluginHubDialog
+        diag = PluginHubDialog(self)
+        diag.hub_widget.plugin_state_changed.connect(self.load_settings)
+        diag.exec()
+        self.load_settings()
+
     def load_settings(self):
         """载入当前配置并绑定控件状态"""
-        # 1. 载入插件列表与托盘常驻管理列表
-        all_plugins = self.plugin_manager.get_all_plugins()
+        # 1. 载入插件列表与托盘常驻管理列表 (包含已启用与停用插件)
+        all_plugins = list(self.plugin_manager.get_all_plugins())
+        loaded_ids = {p.id for p in all_plugins}
+        for r in self.plugin_manager.get_all_plugin_records():
+            if r["id"] not in loaded_ids:
+                class _StubPlugin:
+                    pass
+                stub = _StubPlugin()
+                stub.id = r["id"]
+                stub.name = r["name"]
+                stub.category = r["category"]
+                stub.description = r["description"]
+                stub.sort_order = r["sort_order"]
+                all_plugins.append(stub)
+        all_plugins.sort(key=lambda x: getattr(x, "sort_order", 100))
+
         disabled_plugins = set(self.config_manager.get_disabled_plugins())
         tray_plugins = set(self.config_manager.get_tray_plugins())
 
@@ -1055,11 +1083,17 @@ class SettingsDialog(QDialog):
 
     def _apply_settings_action(self):
         """执行保存并应用"""
-        # 1. 保存插件启用/禁用状态
+        # 1. 保存插件启用/禁用状态并执行动态热启停 (仅在状态真正变更时触发，避免全量卡顿)
+        old_disabled = set(self.config_manager.get_disabled_plugins())
         disabled = []
         for p_id, cb in self._plugin_checkboxes.items():
             if not cb.isChecked():
                 disabled.append(p_id)
+                if p_id not in old_disabled:
+                    self.plugin_manager.disable_plugin(p_id)
+            else:
+                if p_id in old_disabled:
+                    self.plugin_manager.enable_plugin(p_id)
         self.config_manager.set("disabled_plugins", disabled, auto_save=False)
 
         # 1.1 保存独立系统托盘常驻配置

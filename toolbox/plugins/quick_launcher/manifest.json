@@ -1,0 +1,11 @@
+{
+  "id": "quick_launcher",
+  "name": "极速启动器 (Spotlight)",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "效率工具",
+  "description": "类 Raycast/Spotlight 全局极速召唤栏，拼音秒搜插件、安全算式计算、Base64编解码与屏幕拾色。",
+  "icon": "search",
+  "sort_order": 1,
+  "entry_point": "plugin.py"
+}

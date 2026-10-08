@@ -1,0 +1,11 @@
+{
+  "id": "screen_recorder",
+  "name": "高清屏幕录像机",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "媒体处理",
+  "description": "全功能屏幕录制工具，支持全屏录制、指定窗口录制与自定义矩形区域录像，集成音频捕获与高质量压制。",
+  "icon": "monitor",
+  "sort_order": 27,
+  "entry_point": "plugin.py"
+}

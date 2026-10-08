@@ -1,0 +1,11 @@
+{
+  "id": "osu_skin_studio",
+  "name": "osu!mania 皮肤调校工作台",
+  "version": "1.5.0",
+  "author": "Chieri",
+  "category": "音游工具",
+  "description": "专为 osu!mania 皮肤打造：实时调节判定线高度、舞台起始偏移与列宽数组，内置高保真画布即时渲染。",
+  "icon": "sparkles",
+  "sort_order": 50,
+  "entry_point": "plugin.py"
+}

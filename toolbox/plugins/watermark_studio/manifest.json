@@ -1,0 +1,11 @@
+{
+  "id": "watermark_studio",
+  "name": "水印防盗工坊",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "图像工具",
+  "description": "批量全图平铺防盗水印、身份证/营业执照防滥用专用隐私水印与肉眼不可见的隐形频域盲水印。",
+  "icon": "image",
+  "sort_order": 28,
+  "entry_point": "plugin.py"
+}

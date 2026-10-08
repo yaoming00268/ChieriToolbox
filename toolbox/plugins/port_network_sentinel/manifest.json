@@ -1,0 +1,11 @@
+{
+  "id": "port_network_sentinel",
+  "name": "端口网络哨兵",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "系统增强",
+  "description": "毫秒级探测本地处于 LISTENING 状态端口、定位并一键强杀占用进程、管理 Hosts 与刷新 DNS 缓存。",
+  "icon": "network",
+  "sort_order": 82,
+  "entry_point": "plugin.py"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "media_compressor",
+  "name": "图片与视频体积压缩",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "媒体处理",
+  "description": "批量压缩图片与视频体积，采用业界领先的 WebP/MozJPEG 及 FFmpeg H.264/HEVC/AV1 CRF 算法。",
+  "icon": "zap",
+  "sort_order": 23,
+  "entry_point": "plugin.py"
+}

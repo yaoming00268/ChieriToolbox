@@ -18,3 +18,61 @@ _app = QApplication.instance()
 if not _app:
     _app = QApplication(["--platform", "offscreen"])
 
+import gc
+import pytest
+
+def pytest_runtest_teardown(item, nextitem):
+    """
+    Hook executed after every test case.
+    Forcefully hides tray icons, closes top-level widgets, purges all remaining widgets
+    via DeferredDelete event flushing, and invokes garbage collection to prevent memory ballooning
+    and UI freezing during test suite execution.
+    """
+    app = QApplication.instance()
+    if app:
+        try:
+            from PySide6.QtCore import QEvent
+            from PySide6.QtWidgets import QSystemTrayIcon
+            for tray in list(app.findChildren(QSystemTrayIcon)):
+                try:
+                    tray.hide()
+                    tray.deleteLater()
+                except Exception:
+                    pass
+            for widget in list(app.topLevelWidgets()):
+                try:
+                    if hasattr(widget, "app_tray_icon") and widget.app_tray_icon:
+                        widget.app_tray_icon.hide()
+                    if hasattr(widget, "tray_icon") and widget.tray_icon:
+                        widget.tray_icon.hide()
+                    if hasattr(widget, "cleanup"):
+                        try:
+                            widget.cleanup()
+                        except Exception:
+                            pass
+                    widget.close()
+                    widget.deleteLater()
+                except Exception:
+                    pass
+            for widget in list(app.allWidgets()):
+                try:
+                    widget.deleteLater()
+                except Exception:
+                    pass
+            app.sendPostedEvents(None, QEvent.DeferredDelete)
+            app.processEvents()
+        except Exception:
+            pass
+    try:
+        from toolbox.core.plugin_manager import PluginManager
+        PluginManager.reset_instance()
+    except Exception:
+        pass
+    try:
+        from toolbox.core.config_manager import ConfigManager
+        ConfigManager().set_multi_window_mode(False)
+    except Exception:
+        pass
+    gc.collect()
+
+

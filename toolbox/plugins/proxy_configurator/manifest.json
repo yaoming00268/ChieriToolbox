@@ -1,0 +1,11 @@
+{
+  "id": "proxy_configurator",
+  "name": "应用代理配置工具",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "系统增强",
+  "description": "一键快速配置与切换 Windows 系统代理、环境变量 (HTTP/HTTPS)、Git 代理与 pip 镜像代理。",
+  "icon": "network",
+  "sort_order": 64,
+  "entry_point": "plugin.py"
+}

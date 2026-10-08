@@ -1,0 +1,11 @@
+{
+  "id": "video_to_audio",
+  "name": "批量视频转音频",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "音频工具",
+  "description": "批量拖拽视频文件提取音频轨道，支持 MP3 / FLAC / WAV / AAC / M4A / OGG 格式与码率调节。",
+  "icon": "music",
+  "sort_order": 32,
+  "entry_point": "plugin.py"
+}

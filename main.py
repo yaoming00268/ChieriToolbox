@@ -214,8 +214,8 @@ def run_smoke_test() -> int:
             import shutil
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    # 4. 全量 22 个插件动态发现与 UI 实例化验证
-    print("\n--- 4. 验证全量 22 个插件动态发现与 UI 实例化 ---")
+    # 4. 全量 28 个插件动态发现与 UI 实例化验证
+    print("\n--- 4. 验证全量 28 个插件动态发现与 UI 实例化 ---")
     from PySide6.QtWidgets import QApplication
     _app = QApplication.instance()
     if not _app:
@@ -225,7 +225,7 @@ def run_smoke_test() -> int:
         pm = PluginManager()
         pm.discover_and_load()
         plugins = pm.get_all_plugins()
-        print(f"[*] 成功扫描并加载插件总数: {len(plugins)} / 22")
+        print(f"[*] 成功扫描并加载插件总数: {len(plugins)} / 28")
 
         for p in plugins:
             try:
@@ -248,8 +248,8 @@ def run_smoke_test() -> int:
                 report["errors"].append(err)
                 print(f"[FAIL] 插件 [{p.id}] 界面异常: {e}")
 
-        if len(plugins) < 22:
-            err = f"预期加载 22 个插件，实际仅加载 {len(plugins)} 个！"
+        if len(plugins) < 28:
+            err = f"预期加载至少 28 个插件，实际仅加载 {len(plugins)} 个！"
             report["errors"].append(err)
             print(f"[FAIL] {err}")
     except Exception as e:

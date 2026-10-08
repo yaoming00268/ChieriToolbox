@@ -12,33 +12,39 @@
 
 明明最初只是想随手扒几首二次元新番 ED、顺手截几张老婆的 1080P/4K 高清壁纸、给 osu!mania 搓几个手感舒服的打歌皮肤...结果写着写着就把整个 Windows 桌面生态全给卷进来了。才、才不是特意为了你们这些现充写的呢！这可是本死宅自用的终极效率利器 (*/ω＼*)！
 
-本工具箱集成了整整 22 个即插即用动态扩展插件，同时带来了全新重磅构建的 **Android 移动端版本**！桌面端采用 Fluent 暗黑磨砂质感视觉设计，右上角常驻 `Esc` 键一键瞬间逃跑回城；移动端采用 100% SVG 极简现代矢量视觉、深浅双色切换与双轨悬浮交互体系。无论在 PC 桌面还是手机平板上，都能随时从容应对各种生产力与二次元娱乐场景！
+本工具箱集成了整整 **28 个即插即用动态扩展插件**，同时带来了全新重磅构建的 **Android 移动端版本**！桌面端采用 Fluent 暗黑磨砂质感视觉设计，右上角常驻 `Esc` 键一键瞬间逃跑回城；移动端采用 100% SVG 极简现代矢量视觉、深浅双色切换与双轨悬浮交互体系。无论在 PC 桌面还是手机平板上，都能随时从容应对各种生产力与二次元娱乐场景！
 
 ---
 
 ## 核心特性与阿宅友好设计
 
 1. **PC & Android 双端互通与跨设备算力协同 (Local Cloud)**
-   桌面端提供 22 大即插即用动态插件与四大内置核心引擎；PC 端内置轻量 Local Cloud 本地云服务（支持局域网 UDP 自动广播自发现与 REST API），移动端可将高负载 AI 超分任务一键卸载至电脑算力执行！
+   桌面端提供 28 大即插即用动态插件与四大内置核心引擎；PC 端内置轻量 Local Cloud 本地云服务（支持局域网 UDP 自动广播自发现与 REST API），移动端可将高负载 AI 超分任务一键卸载至电脑算力执行！
 
-2. **AI 模型按需动态下载 (On-Demand Model Manager)**
+2. **全局后台任务中心 (Global Task Manager 并发限流与防卡死)**
+   采用统一后台调度引擎，支持多插件并发排队、限流保护、取消控制与内存自平衡监控，彻底杜绝多个重型多媒体或 AI 任务同时跑满 CPU/内存引发的系统假死。
+
+3. **插件中心与全解耦独立导出 (Plugin Hub & Decoupled Lifecycle)**
+   所有插件遵循标准化 `manifest.json` 清单定义与沙箱隔离规范。提供可视化插件中心，支持任意单插件一键启用/禁用热加载，更支持一键导出解耦独立的绿色便携包或编译为原生 Inno Setup 安装包。
+
+4. **AI 模型按需动态下载 (On-Demand Model Manager)**
    针对 Real-CUGAN、Real-ESRGAN、Waifu2x 超分模型及 Demucs、Spleeter 人声分离模型，采用轻量解耦按需动态拉取架构，彻底杜绝安装包体积膨胀。内置模型中心支持 SHA256 哈希校验与多镜像源切换。
 
-3. **统一暗黑仪表盘 (Dashboard)**
-   所有武器库卡片在首页网格平铺，支持拼音与关键字实时过滤、分类标签筛选。想用哪个点哪个，不用在一堆快捷方式里翻箱倒柜。
+5. **统一暗黑仪表盘 (Dashboard) 与极速启动台 (Quick Launcher)**
+   所有武器库卡片在首页网格平铺，支持拼音与关键字实时过滤、分类标签筛选；集成类似 Spotlight 的极速呼出启动台，全局热键唤醒，秒级直达任意插件与系统工具。
 
-4. **随时随地 Esc / 返回键瞬间回城**
+6. **随时随地 Esc / 返回键瞬间回城**
    桌面端任何插件界面的右上角均设有显著的返回按钮，猛敲 `Esc` 键或按下 `Alt + Left` 立即无条件切回主页；移动端深度对接系统物理/手势返回键，智能层级返回，极其省电环保。
 
-5. **四大核心引擎全自包含 (免配系统环境变量)**
-   PC 工具箱内置了预编译的 `ffmpeg`、`7z`、`ffprobe`、`ffplay` 二进制组件。无论是解压便携版还是安装版，双击直接起飞，彻底告别“请配置 PATH 环境变量”的远古折磨。
+7. **四大核心引擎全自包含 (免配系统环境变量)**
+   PC 工具箱内置了预编译的 `ffmpeg`、`7z`、`ffprobe`、`ffplay` 二进制组件及内置 Inno Setup 编译器。无论是解压便携版还是安装版，双击直接起飞，彻底告别“请配置 PATH 环境变量”的远古折磨。
 
-6. **安全沙箱与插件热插拔机制**
+8. **安全沙箱与插件热插拔机制**
    各功能遵循标准规范，按需懒加载实例化。单个插件内部哪怕发生不可抗力异常崩溃，也会被沙箱优雅拦截并记录日志，整个工具箱基座纹丝不动。
 
 ---
 
-## 重点武器库指南 (22大插件一览)
+## 重点武器库指南 (28大即插即用插件一览)
 
 ### 1. B站媒体收割与解构一条龙 (`media_downloader`)
 专为收录二次元动画原声、MMD 与高质量同人视频打造的下载引擎：
@@ -56,20 +62,57 @@
 - **坐标区域显式剪裁**: 支持指定 `(left, top, right, bottom)` 像素矩形剪裁，截取本子或插画局部细节快准狠。
 - **高保真缩放**: 百分比缩放与固定分辨率等比缩放均采用高质量 Lanczos 滤波器，保持线条边缘锐利清晰。
 
-### 3. 音频精准剪裁与音轨提取 (`audio_cutter` & `video_to_audio` & `audio_converter`)
+### 3. 音频精准剪裁与录音工坊 (`audio_cutter` & `video_to_audio` & `audio_converter` & `audio_recorder`)
 - **毫秒级时间轴剪裁**: 视音频波形时间轴精准切割，支持流拷贝（0 损耗秒级切片）与重编码双模式，用来切二次元歌曲铃声或者剪 MAD 音效简直爽到飞起。
 - **批量视频转音频**: 批量丢入本地动漫番剧或 MV 视频，一键抽离背景音乐并转换为高品质 MP3 / FLAC。
 - **音频批量格式转换**: 音频码率、采样率、声道数随心调整。
+- **高清音频录制器**: 支持麦克风音频采集与系统声卡内录，导出为高保真 WAV/MP3。
 
-### 4. 视频逐帧解压提取 (`frame_extractor`)
+### 4. 视频逐帧解压提取与多媒体压缩 (`frame_extractor` & `media_compressor`)
 - **逐帧与定时抽帧**: 自由设置每秒帧数（FPS）或时间间隔采样，捕捉动画每一帧神仙作画。
 - **I 关键帧模式**: 自动适配 FFmpeg 新版 `passthrough` / `vfr` 语法，只提取不模糊的 I 关键帧，生成高质量壁纸原画素材。
+- **音视频体积智能压制**: 采用 H.264/H.265 CRF 恒定质量压缩算法，在保证二次元画质肉眼无损的前提下将体积压缩 50%~80%。
 
 ### 5. 音游狗专属: osu!mania 皮肤调校工作台 (`osu_skin_studio`)
 - **结构化读写 `skin.ini`**: 可视化调节判定线位置（HitPosition）、列宽（ColumnWidth）、舞台偏移（ScorePosition/ComboPosition）等。
 - **实时视口画布预览**: 4K 到 9K 键位实时渲染，支持 16:9 与 4:3 视口切换，调皮肤再也不用繁琐地反复重启游戏测试了 (￣▽￣)ノ。
 
-### 6. 更多阿宅日常护肝利器
+### 6. 无限剪贴板历史与智能清理 (`clipboard_manager`) [新特性]
+- **系统级自动监听**: 毫秒级后台捕获剪贴板文本与图片变更，记录完整操作时间轴。
+- **分类收藏与快捷置顶**: 常用文本、代码片段一键加入收藏夹，跨工作区快速调用。
+- **智能隐私脱敏**: 自动识别密码、API Token、手机号等敏感信息并可配置一键脱敏。
+- **一键纯文本化与清理**: 去除富文本格式、首尾空白符与冗余换行，避免代码粘贴带入隐形脏字符。
+
+### 7. 环境变量快速切换与健康诊断 (`env_var_switcher`) [新特性]
+- **图形化多层级管理**: 统一维护当前用户与系统级环境变量，直观查看所有键值。
+- **Path 路径健康诊断**: 自动排查失效死链、不存在的目录以及重复路径条目，支持一键无损清理去重。
+- **多版本开发环境秒级切换**: 支持预设多套 Python、Node.js、Java、Go 等环境变量快照，瞬间完成环境切换。
+
+### 8. JSON / 文本高亮对比工作台 (`json_diff_studio`) [新特性]
+- **结构化树形美化**: 支持杂乱 JSON 一键缩进、美化排版与语法错误即时高亮。
+- **双栏 Monaco 风格比对**: 左右分栏高亮比对两段 JSON 或文本的增、删、改差异，支持内联行级精准 Diff。
+- **一键导出差异报告**: 支持将差异结果导出为文本补丁或格式化对比视图。
+
+### 9. 端口占用监控与网络诊断哨兵 (`port_network_sentinel`) [新特性]
+- **端口与进程精准透视**: 秒级扫描本地 TCP/UDP 正在监听与连接的端口，定位占用进程 PID 与可执行文件路径。
+- **一键强力终结占用**: 遇到端口死锁或幽灵进程冲突时，一键强制杀死占用进程释放端口。
+- **网络连通性诊断**: 内置 Ping 延迟测试、Traceroute 路由追踪及本地网络适配器 IP/MAC 信息速查。
+
+### 10. 应用极速启动台 (Spotlight) (`quick_launcher`) [新特性]
+- **全局呼出悬浮面板**: 全局热键随叫随到，类 macOS Spotlight / Raycast 流畅体验。
+- **拼音与首字母模糊搜索**: 快速索引本机桌面应用、快捷方式、自定义脚本以及工具箱内部 28 大功能。
+- **托盘常驻与无缝回城**: 随时按 `Esc` 隐退，纯内存运行，极致省电轻量。
+
+### 11. 全能水印批处理工坊 (`watermark_studio`) [新特性]
+- **批量文字与 Logo 水印**: 支持平铺水印、九宫格固定位置、字体大小、不透明度、倾斜角度及阴影全维度微调。
+- **不可见频域隐形盲水印**: 基于离线频域变换将隐形版权标识嵌入图像，肉眼完全不可见，耐受截图与压缩，二次元创作者防盗图版权溯源终极利器。
+
+### 12. 专业截图工具与离线 OCR (`screen_capture` + `ocr_engine`)
+- **PixPin 风格专业截图标注**: 矩形框选、画笔涂鸦、序号标记、箭头指示与马赛克遮挡。
+- **贴图置顶与像素放大镜**: 截图一键钉在屏幕最上层；取色器像素级放大并快速复制 HEX/RGB 色值。
+- **离线 OCR 文字识别引擎**: 框选截屏区域后一键识别图中汉字与英文，毫秒级提取文本并自动复制至剪贴板。
+
+### 13. 更多阿宅日常护肝利器
 - **全平台音乐格式解密工坊 (`ncm_decryptor`)**:
   - **网易云音乐**: `.ncm` 格式一键无损还原为标准 MP3/FLAC，保留元数据与封面。
   - **QQ音乐 QMC**: 智能识别 QMCv1 与 QMCv2 算法，支持 `.qmc3`, `.qmc0`, `.qmcflac`, `.mflac`, `.mgg` 解密。
@@ -77,7 +120,6 @@
   - **酷我音乐 KWM**: 支持 `.kwm` 动态报头解析与掩码逆向探测解密。
 - **压缩解压与 ACG 密码本 (`archive_manager`)**: 基于 7-Zip LZMA2 引擎，支持 7z/zip/rar 高压缩比打包与解压；内置 **ACG 资源解压密码本**，收集各大二次元资源站/论坛高频密码，解密包自动轮询暴力匹配一键解开。
 - **文件批量整理大师 (`file_suite`)**: 正则批量改名、前后缀替换、数字序号对齐补零、文件夹扁平化整理，整顿几万张杂乱同人图的救星。
-- **专业截图工具 (`screen_capture`)**: PixPin 风格截图标注、贴图置顶、放大镜像素吸色。
 - **高清屏幕录像机 (`screen_recorder`)**: 虚拟桌面全屏或区域录像，音画同步捕获游戏精彩操作。
 - **顽固应用与文件强力粉碎 (`force_killer`)**: 遇到被 Windows 进程死锁占用的文件，一键查杀占用句柄并强力抹除。
 - **交互式白板 (`whiteboard`)**: 希沃白板风格，摸鱼随手涂鸦、画草图、笔划撤销与整幅导出。
@@ -85,6 +127,8 @@
 - **应用代理配置工具 (`proxy_configurator`)**: 一键查看与开关应用代理环境。
 - **全能文本翻译 (`translator`)**: 快速多语言文本对照。
 - **系统增强与右键助手 (`system_integrator`)**: 一键为 Windows 右键菜单注入快捷通道，无需管理员权限。
+- **WebDAV 远程同步配置 (`webdav_config`)**: 图形化配置坚果云、Nextcloud 等 WebDAV 服务与端点连接。
+- **境外视频解析下载 (`youtube_downloader`)**: 集成 yt-dlp 核心引擎，支持海外流媒体高质量视频与音频提取。
 
 ---
 
@@ -162,8 +206,8 @@
 
 | 分发包文件 | 平台架构 | 文件大小 | 特性说明与直链高速下载 |
 |:---|:---:|:---:|:---|
-| **[📦 Setup_ChieriToolbox.exe](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/Setup_ChieriToolbox.exe)** | Windows x64 | ~170 MB | 基于 Inno Setup 6 编译构建的标准单文件安装向导，内置 LZMA2 固实压缩、四大引擎 (FFmpeg, 7-Zip, FFprobe, FFplay) 与桌面/开始菜单快捷方式 |
-| **[📦 ChieriToolbox-v2.0.0-Portable.zip](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/ChieriToolbox-v2.0.0-Portable.zip)** | Windows x64 | ~228 MB | 绿色免安装便携版，解压至任意目录双击 `ChieriToolbox.exe` 即开即用，配置持久化于当前目录，纯净不污染系统 |
+| **[📦 Setup_ChieriToolbox.exe](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/Setup_ChieriToolbox.exe)** | Windows x64 | ~180 MB | 基于 Inno Setup 6 编译构建的标准单文件安装向导，内置 LZMA2 固实压缩、28 大全量插件、四大引擎 (FFmpeg, 7-Zip, FFprobe, FFplay) 与桌面/开始菜单快捷方式 |
+| **[📦 ChieriToolbox-v2.0.0-Portable.zip](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/ChieriToolbox-v2.0.0-Portable.zip)** | Windows x64 | ~242 MB | 绿色免安装便携版，解压至任意目录双击 `ChieriToolbox.exe` 即开即用，内置 28 大插件，配置持久化于当前目录，纯净不污染系统 |
 | **[📱 ChieriToolbox-Android.apk](https://github.com/yaoming00268/ChieriToolbox/releases/download/v2.0.0/ChieriToolbox-Android.apk)** | Android 8.0+ (ARM64/x86) | ~6.14 MB | Android 极简轻量移动端，内置 Kotlin 原生硬件加速 + 100% SVG 矢量 UI + 双轨悬浮窗，体积超轻，离线全自包含 |
 
 ### 移动端 Android 安装包使用指引
@@ -203,9 +247,9 @@ pip install -r requirements.txt  # 或安装 PySide6, requests, Pillow, yt-dlp
 或者直接双击根目录下的 `启动工具箱.bat`。
 
 ### 3. 执行自动化测试套件
-本项目具备完备的测试验证体系（涵盖 222 项全量自动化测试、B站音视频流水线、图片裁剪缩放、音频剪裁与 22 插件完整生命周期）：
+本项目具备完备的测试验证体系（涵盖 267 项全量自动化测试、B站音视频流水线、图片裁剪缩放、音频剪裁与 28 插件完整解耦生命周期）：
 ```powershell
-# 运行全量 222 项自动化集成测试
+# 运行全量 267 项自动化集成测试
 .\.venv\Scripts\pytest
 
 # 运行桌面端动态寻路与核心引擎冒烟测试
@@ -236,10 +280,11 @@ node android/test_mobile_engines.js
 ## 测试跑分与稳定性验证记录
 
 本工具箱代码经过严格的闭环集成验证与高强度自动化回归测试：
-- **全量单元与真实集成测试**: `pytest tests/` 共 **231 项自动化测试 100% 全部通过** (包括 22 个插件动态发现、B站流水线、模型按需下载管理器、局域网本地云协同、多平台音乐解密及 ACG 密码本自动化测试)。
+- **全量单元与真实集成测试**: `pytest tests/` 共 **267 项自动化测试 100% 全部通过 (266 passed, 1 skipped)** (包括 28 个插件动态发现与解耦生命周期、后台任务并发调度、B站流水线、模型按需下载管理器、局域网本地云协同、多平台音乐解密及 ACG 密码本自动化测试)。
+- **架构跃升与解耦专项测试**: `tests/test_boost_evolution.py` 与 `tests/test_plugin_decouple_and_lifecycle.py` 覆盖 28 插件解耦独立导出、Task Manager 并发限流与防卡死保护、OCR 引擎文字提取、manifest 清单校验，**全部通过**。
 - **进化特性专项回归测试**: `tests/test_evolution_features.py` 覆盖 Local Cloud HTTP/UDP 广播发现、超分接口、多源模型下载、QMC/KGM/KWM 音频解密、弹幕 ASS 转换及 ACG 密码匹配，**9/9 全项通过**。
 - **多 DPI 与多分辨率视觉自适应测试**: `tests/test_ui_adaptive_visual.py` 覆盖 100% (1.0x)、125% (1.25x)、150% (1.5x) 多档系统 DPI 缩放及从 1024x700 紧凑到 1920x1080 全高清多档窗口尺寸，产出 33 份全界面截图（保存在 `tests/ui_screenshots/dpi_adaptive/`），均无控件重叠或文本截断。
-- **冻结可执行文件冒烟测试**: 打包版独立程序执行 `ChieriToolbox.exe --smoke-test`，22 个插件动态发现、5 大底层可执行工具寻路（ffmpeg, 7z, ffprobe, ffplay, inno_setup_iscc）与持久化配置读写 **全部通过 (PASSED)**。
+- **冻结可执行文件冒烟测试**: 打包版独立程序执行 `ChieriToolbox.exe --smoke-test`，28 个插件动态发现、5 大底层可执行工具寻路（ffmpeg, 7z, ffprobe, ffplay, inno_setup_iscc）与持久化配置读写 **全部通过 (PASSED)**。
 - **Android 移动端核心引擎自动化测试**: `node android/test_mobile_engines.js` 覆盖 AudioEngine (WAV/MP3/FLAC 结构校验)、MediaEngine (Cookie / SESSDATA 清洗解析)、ArchiveEngine (POSIX TAR / 7Z / LZ4 流式解压)、TranslatorEngine (RFC 1321 MD5 签名生成、ACG 离线词库) 以及 CrossDeviceEngine 跨设备端点解析与超分载荷装配，**24 项测试 100% 全部通过 (PASS)**。
 - **Android 真机与模拟器 UI 自动化与外观测试**: 覆盖冷启动加载、抽屉侧边栏平滑交互、系统返回键栈导航、应用内悬浮球物理吸附/半贴边折叠、全局系统悬浮窗 (`FloatingBallService`) 跨应用常驻与唤醒、深浅色模式与卡片外观调节，全流程验证通过。
 

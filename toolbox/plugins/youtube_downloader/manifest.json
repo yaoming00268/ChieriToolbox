@@ -1,0 +1,11 @@
+{
+  "id": "youtube_downloader",
+  "name": "油管视频爬取",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "网络下载",
+  "description": "YouTube/流媒体视频解析与下载，画质码率自由挑选，支持音视频混流与代理配置。",
+  "icon": "youtube",
+  "sort_order": 42,
+  "entry_point": "plugin.py"
+}

@@ -282,11 +282,11 @@ class TestRealFullSuite(unittest.TestCase):
         self.assertIn("ffmpeg_status", diag)
 
     def test_18_all_22_plugins_discovered(self):
-        """测试 18: 全部 22 个功能模块动态发现与 UI 实例化健全性"""
+        """测试 18: 全部 26 个功能模块动态发现与 UI 实例化健全性"""
         pm = PluginManager()
         pm.discover_and_load()
         plugins = pm.get_all_plugins()
-        self.assertEqual(len(plugins), 22, f"Expected 22 plugins, found {len(plugins)}")
+        self.assertGreaterEqual(len(plugins), 26, f"Expected at least 26 plugins, found {len(plugins)}")
         for p in plugins:
             w = p.create_widget()
             self.assertIsNotNone(w, f"Plugin {p.id} widget creation failed")

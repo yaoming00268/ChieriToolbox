@@ -107,20 +107,68 @@ def get_config_path(filename: str = "toolbox_config.json") -> str:
     return os.path.normpath(os.path.join(get_app_root(), filename))
 
 
+def is_portable_mode() -> bool:
+    """
+    判断当前应用是否工作在绿色便携模式。
+    判定规则：
+    1. 启动命令行包含 --portable
+    2. exe 根目录存在 plugins_data/ 或 data/ 目录
+    3. exe 根目录存在 portable.flag 或 .portable 标记文件
+    """
+    if "--portable" in sys.argv:
+        return True
+    root = get_app_root()
+    if os.path.isdir(os.path.join(root, "plugins_data")) or os.path.isdir(os.path.join(root, "data")):
+        return True
+    if os.path.isfile(os.path.join(root, "portable.flag")) or os.path.isfile(os.path.join(root, ".portable")):
+        return True
+    return False
+
+
+def get_external_plugins_dir() -> str:
+    """
+    获取外部扩展插件的标准安装/存放目录：
+    - 便携版优先使用: <exe_dir>/plugins_data/
+    - 安装版默认使用: %APPDATA%/ChieriToolbox/plugins/
+    """
+    if is_portable_mode():
+        target = os.path.normpath(os.path.join(get_app_root(), "plugins_data"))
+    else:
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            target = os.path.normpath(os.path.join(appdata, "ChieriToolbox", "plugins"))
+        else:
+            target = os.path.normpath(os.path.join(get_app_root(), "plugins_data"))
+    return target
+
+
 def get_plugins_search_dirs() -> list:
     """
     获取所有有效的插件扫描目录集合。
-    支持内置插件 (bundle_dir/toolbox/plugins) 与外部扩展插件目录 (app_root/plugins)。
+    同时兼容内置目录与外部独立扩展目录（安装版 %APPDATA%/ChieriToolbox/plugins/，便携版 <exe_dir>/plugins_data/ 及 app_root/plugins）。
     """
     dirs = []
+    appdata = os.environ.get("APPDATA")
+    appdata_plugins = os.path.join(appdata, "ChieriToolbox", "plugins") if appdata else None
+
     candidates = [
+        # 1. 内置插件目录
         os.path.join(get_bundle_dir(), "toolbox", "plugins"),
         os.path.join(get_app_root(), "toolbox", "plugins"),
         os.path.join(get_bundle_dir(), "_internal", "toolbox", "plugins"),
         os.path.join(get_app_root(), "_internal", "toolbox", "plugins"),
+        # 2. 便携独立扩展目录 (<exe_dir>/plugins_data)
+        os.path.join(get_app_root(), "plugins_data"),
+        # 3. 根目录常规外部插件目录
         os.path.join(get_app_root(), "plugins"),
     ]
+    # 4. 安装版用户目录 (%APPDATA%/ChieriToolbox/plugins)
+    if appdata_plugins:
+        candidates.append(appdata_plugins)
+
     for c in candidates:
+        if not c:
+            continue
         norm = os.path.normpath(c)
         if os.path.isdir(norm) and norm not in dirs:
             dirs.append(norm)

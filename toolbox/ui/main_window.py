@@ -74,6 +74,7 @@ class MainWindow(QMainWindow):
             target_h = min(target_h, max(600, avail.height() - 60))
         self.resize(target_w, target_h)
         self.setMinimumSize(880, 600)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         if w_cfg.get("is_maximized", False):
             self.showMaximized()
         self.apply_visual_settings()
@@ -199,6 +200,33 @@ class MainWindow(QMainWindow):
         self.btn_cloud.clicked.connect(self.open_cloud_dialog)
         nav_layout.addWidget(self.btn_cloud)
 
+        # 核心：插件工坊与模块管理快捷按钮 (Alt+P)
+        self.btn_plugin_hub = QPushButton()
+        self.btn_plugin_hub.setObjectName("flatIconBtn")
+        self.btn_plugin_hub.setIcon(get_icon("puzzle", size=16))
+        self.btn_plugin_hub.setToolTip("千绘莉插件工坊 & 模块管理 (Alt+P)")
+        self.btn_plugin_hub.setFixedSize(32, 32)
+        self.btn_plugin_hub.clicked.connect(self.open_plugin_hub_dialog)
+        nav_layout.addWidget(self.btn_plugin_hub)
+
+        # 核心：Spotlight 极速启动器快捷按钮 (Ctrl+K / Alt+Space)
+        self.btn_spotlight = QPushButton()
+        self.btn_spotlight.setObjectName("flatIconBtn")
+        self.btn_spotlight.setIcon(get_icon("search", size=16))
+        self.btn_spotlight.setToolTip("Spotlight 极速启动与检索 (Ctrl+K / Alt+Space)")
+        self.btn_spotlight.setFixedSize(32, 32)
+        self.btn_spotlight.clicked.connect(self.open_spotlight)
+        nav_layout.addWidget(self.btn_spotlight)
+
+        # 核心：全局后台任务中心按钮
+        self.btn_tasks = QPushButton()
+        self.btn_tasks.setObjectName("flatIconBtn")
+        self.btn_tasks.setIcon(get_icon("play", size=16))
+        self.btn_tasks.setToolTip("全局后台任务中心")
+        self.btn_tasks.setFixedSize(32, 32)
+        self.btn_tasks.clicked.connect(self.open_task_manager_dialog)
+        nav_layout.addWidget(self.btn_tasks)
+
         # 核心：设置中心按钮
         self.btn_settings = QPushButton()
         self.btn_settings.setObjectName("flatIconBtn")
@@ -267,10 +295,12 @@ class MainWindow(QMainWindow):
         self.btn_theme_light.setIcon(get_icon("sun", color=active_color if mode == THEME_LIGHT else inactive_color, size=15))
         self.btn_theme_dark.setIcon(get_icon("moon", color=active_color if mode == THEME_DARK else inactive_color, size=15))
         self.btn_theme_system.setIcon(get_icon("monitor", color=active_color if mode == THEME_SYSTEM else inactive_color, size=15))
+        self.btn_plugin_hub.setIcon(get_icon("puzzle", color=active_color if is_dark else "#475569", size=16))
+        self.btn_spotlight.setIcon(get_icon("search", color=active_color if is_dark else "#475569", size=16))
         self.btn_settings.setIcon(get_icon("settings", color=active_color if is_dark else "#475569", size=16))
 
     def init_shortcuts(self):
-        """注册全局快捷键返回首页与设置"""
+        """注册全局快捷键返回首页、插件工坊与设置"""
         shortcut_esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
         shortcut_esc.activated.connect(self.go_to_home)
 
@@ -280,6 +310,15 @@ class MainWindow(QMainWindow):
         shortcut_alt_home = QShortcut(QKeySequence("Alt+Home"), self)
         shortcut_alt_home.activated.connect(self.go_to_home)
 
+        shortcut_hub = QShortcut(QKeySequence("Alt+P"), self)
+        shortcut_hub.activated.connect(self.open_plugin_hub_dialog)
+
+        shortcut_spotlight_k = QShortcut(QKeySequence("Ctrl+K"), self)
+        shortcut_spotlight_k.activated.connect(self.open_spotlight)
+
+        shortcut_spotlight_space = QShortcut(QKeySequence("Alt+Space"), self)
+        shortcut_spotlight_space.activated.connect(self.open_spotlight)
+
         shortcut_settings = QShortcut(QKeySequence("Alt+S"), self)
         shortcut_settings.activated.connect(self.open_settings_dialog)
 
@@ -287,8 +326,102 @@ class MainWindow(QMainWindow):
         self.event_bus.navigate_home.connect(self.go_to_home)
         self.event_bus.navigate_to_plugin.connect(self.switch_to_plugin)
         self.event_bus.status_message.connect(self.status_bar.showMessage)
-        self.event_bus.theme_changed.connect(lambda t: (self._sync_theme_buttons(), self._update_nav_icons()))
+        self.event_bus.theme_changed.connect(self._on_theme_changed_event)
         self.event_bus.settings_changed.connect(self._on_settings_changed)
+
+        # 插件管理器生命周期全局联动
+        self.plugin_manager.plugin_loaded.connect(self._on_plugin_loaded_event)
+        self.plugin_manager.plugin_unloaded.connect(self._on_plugin_unloaded_event)
+        self.plugin_manager.plugin_enabled.connect(self._on_plugin_loaded_event)
+        self.plugin_manager.plugin_disabled.connect(self._on_plugin_unloaded_event)
+        self.plugin_manager.plugin_installed.connect(self._on_plugin_loaded_event)
+        self.plugin_manager.plugin_uninstalled.connect(self._on_plugin_unloaded_event)
+        self.destroyed.connect(self.cleanup)
+
+    def _on_theme_changed_event(self, theme_name: str):
+        self._sync_theme_buttons()
+        self._update_nav_icons()
+
+    def cleanup(self):
+        """断开与全局事件总线和插件管理器的信号绑定，回收内存并杜绝失效回调"""
+        if getattr(self, "_is_cleaned_up", False):
+            return
+        self._is_cleaned_up = True
+        for sig, slot in (
+            (self.event_bus.navigate_home, self.go_to_home),
+            (self.event_bus.navigate_to_plugin, self.switch_to_plugin),
+            (self.event_bus.status_message, self.status_bar.showMessage),
+            (self.event_bus.theme_changed, self._on_theme_changed_event),
+            (self.event_bus.settings_changed, self._on_settings_changed),
+            (self.plugin_manager.plugin_loaded, self._on_plugin_loaded_event),
+            (self.plugin_manager.plugin_unloaded, self._on_plugin_unloaded_event),
+            (self.plugin_manager.plugin_enabled, self._on_plugin_loaded_event),
+            (self.plugin_manager.plugin_disabled, self._on_plugin_unloaded_event),
+            (self.plugin_manager.plugin_installed, self._on_plugin_loaded_event),
+            (self.plugin_manager.plugin_uninstalled, self._on_plugin_unloaded_event),
+        ):
+            try:
+                sig.disconnect(slot)
+            except Exception:
+                pass
+        if hasattr(self, "home_page") and self.home_page:
+            try:
+                self.home_page.cleanup()
+            except Exception:
+                pass
+        if hasattr(self, "_spotlight_win") and self._spotlight_win:
+            try:
+                self._spotlight_win.close()
+                self._spotlight_win.deleteLater()
+                self._spotlight_win = None
+            except Exception:
+                pass
+
+    def open_plugin_hub_dialog(self):
+        """打开千绘莉专属插件工坊与模块管理器"""
+        from toolbox.ui.plugin_hub_dialog import PluginHubDialog
+        diag = PluginHubDialog(self)
+        diag.hub_widget.plugin_state_changed.connect(self._refresh_plugins_display)
+        diag.exec()
+
+    def _refresh_plugins_display(self):
+        plugins = self.plugin_manager.get_all_plugins()
+        self.home_page.set_plugins(plugins)
+        self.status_bar.showMessage(f"已加载 {len(plugins)} 个功能模块，随开随用")
+        self._sync_plugin_trays()
+
+    def _on_plugin_loaded_event(self, plugin):
+        self._refresh_plugins_display()
+
+    def _on_plugin_unloaded_event(self, plugin_id: str):
+        if self.plugin_manager.get_active_plugin_id() == plugin_id:
+            self.go_to_home()
+        removed_idx = None
+        for i in range(self.stack.count() - 1, 0, -1):
+            w = self.stack.widget(i)
+            if getattr(w, "plugin_id", None) == plugin_id or self._plugin_page_indices.get(plugin_id) == i:
+                self.stack.removeWidget(w)
+                try:
+                    w.setParent(None)
+                    w.deleteLater()
+                except Exception:
+                    pass
+                removed_idx = i
+                break
+        self._plugin_page_indices.pop(plugin_id, None)
+        if removed_idx is not None:
+            for pid, idx in list(self._plugin_page_indices.items()):
+                if idx > removed_idx:
+                    self._plugin_page_indices[pid] = idx - 1
+
+        if plugin_id in self._plugin_windows:
+            win = self._plugin_windows.pop(plugin_id)
+            try:
+                win.close()
+                win.deleteLater()
+            except Exception:
+                pass
+        self._refresh_plugins_display()
 
     def open_settings_dialog(self):
         dialog = SettingsDialog(self)
@@ -298,6 +431,25 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(self)
         dialog.tabs.setCurrentIndex(5)
         dialog.exec()
+
+    def open_task_manager_dialog(self):
+        from toolbox.ui.task_manager_dialog import TaskManagerDialog
+        diag = TaskManagerDialog(self)
+        diag.exec()
+
+    def open_spotlight(self):
+        """呼出千绘莉 Spotlight 极速启动与检索悬浮面板 (Ctrl+K / Alt+Space)"""
+        if not hasattr(self, "_spotlight_win") or not self._spotlight_win:
+            from toolbox.plugins.quick_launcher.ui import SpotlightSearchWindow
+            self._spotlight_win = SpotlightSearchWindow(on_select_plugin_callback=self.switch_to_plugin, parent=self)
+        self._spotlight_win.show()
+        self._spotlight_win.raise_()
+        self._spotlight_win.activateWindow()
+
+    def open_plugin_with_data(self, plugin_id: str, data_type: str, data: any):
+        """激活并切换到指定插件，并通过数据管道注入流转数据"""
+        self.switch_to_plugin(plugin_id)
+        self.plugin_manager.pipe_data("", plugin_id, data_type, data)
 
     _open_settings_dialog = open_settings_dialog
 
@@ -602,9 +754,18 @@ class MainWindow(QMainWindow):
             )
             return
 
+        if hasattr(self, "app_tray_icon") and self.app_tray_icon:
+            try:
+                self.app_tray_icon.hide()
+                self.app_tray_icon.deleteLater()
+                self.app_tray_icon = None
+            except Exception:
+                pass
+
         for win in list(self._plugin_windows.values()):
             try:
                 win.close()
+                win.deleteLater()
             except Exception:
                 pass
         self._plugin_windows.clear()
@@ -634,6 +795,8 @@ class MainWindow(QMainWindow):
                 "height": w_cfg.get("height", 750),
                 "is_maximized": True
             })
+        self.cleanup()
+        self.deleteLater()
         super().closeEvent(event)
         QApplication.quit()
 

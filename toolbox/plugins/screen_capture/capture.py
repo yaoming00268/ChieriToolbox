@@ -226,19 +226,25 @@ class PinnedImageViewer(QWidget):
 
 
 class SnipOverlay(QWidget):
-    """PixPin 风格全屏遮罩选区与工具条"""
+    """PixPin 风格全屏遮罩选区、工具条与实时取色放大镜"""
     captured = Signal(QPixmap, str)  # (pixmap, action: 'copy' / 'save' / 'pin')
 
-    def __init__(self, full_pixmap: QPixmap, on_finish: Optional[Callable] = None, parent=None):
+    def __init__(self, full_pixmap: QPixmap, on_finish: Optional[Callable] = None, show_magnifier: bool = True, parent=None):
         super().__init__(parent, Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setMouseTracking(True)
         self.full_pixmap = full_pixmap
+        self._full_image = full_pixmap.toImage() if not full_pixmap.isNull() else None
         self.on_finish = on_finish
+        self.show_magnifier = show_magnifier
 
         self.start_pos: Optional[QPoint] = None
         self.current_pos: Optional[QPoint] = None
+        self.hover_pos: Optional[QPoint] = None
         self.is_selecting: bool = False
         self.selected_rect: Optional[QRect] = None
+        self._copied_toast_text: str = ""
+        self._copied_toast_tick: float = 0.0
 
         self.init_ui()
 
@@ -278,6 +284,16 @@ class SnipOverlay(QWidget):
         btn_pin.clicked.connect(lambda: self._finalize_action("pin"))
         tb_layout.addWidget(btn_pin)
 
+        btn_ocr = QPushButton("识字")
+        btn_ocr.setIcon(get_icon("search", color="#ffffff", size=13))
+        btn_ocr.clicked.connect(lambda: self._finalize_action("ocr"))
+        tb_layout.addWidget(btn_ocr)
+
+        btn_qr = QPushButton("扫码")
+        btn_qr.setIcon(get_icon("sparkles", color="#ffffff", size=13))
+        btn_qr.clicked.connect(lambda: self._finalize_action("qr"))
+        tb_layout.addWidget(btn_qr)
+
         btn_save = QPushButton("保存")
         btn_save.setIcon(get_icon("save", color="#ffffff", size=13))
         btn_save.clicked.connect(lambda: self._finalize_action("save"))
@@ -312,9 +328,10 @@ class SnipOverlay(QWidget):
                 self.close()
 
     def mouseMoveEvent(self, event):
+        self.hover_pos = event.pos()
         if self.is_selecting:
             self.current_pos = event.pos()
-            self.update()
+        self.update()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self.is_selecting:
@@ -347,6 +364,16 @@ class SnipOverlay(QWidget):
             self.close()
         elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._finalize_action("copy")
+        elif event.key() == Qt.Key_C:
+            pos = self.current_pos if (self.is_selecting and self.current_pos) else self.hover_pos
+            if pos and self._full_image and 0 <= pos.x() < self._full_image.width() and 0 <= pos.y() < self._full_image.height():
+                col = self._full_image.pixelColor(pos.x(), pos.y())
+                hex_str = col.name(QColor.HexRgb).upper()
+                QGuiApplication.clipboard().setText(hex_str)
+                self._copied_toast_text = f"已复制色值: {hex_str}"
+                import time
+                self._copied_toast_tick = time.time()
+                self.update()
 
     def _finalize_action(self, action: str):
         if self.selected_rect and not self.full_pixmap.isNull():
@@ -358,6 +385,9 @@ class SnipOverlay(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, False)
+
         # 1. 绘制底层原屏幕画面
         painter.drawPixmap(0, 0, self.full_pixmap)
 
@@ -389,7 +419,99 @@ class SnipOverlay(QWidget):
             painter.setPen(QColor("#ffffff"))
             painter.drawText(tag_rect, Qt.AlignCenter, tag_text)
 
+        # 4. 实时高精度取色放大镜 HUD
+        focus_pos = self.current_pos if (self.is_selecting and self.current_pos) else self.hover_pos
+        if self.show_magnifier and (self.selected_rect is None or self.is_selecting) and focus_pos and self._full_image:
+            px_x, px_y = focus_pos.x(), focus_pos.y()
+            if 0 <= px_x < self._full_image.width() and 0 <= px_y < self._full_image.height():
+                self._draw_magnifier(painter, px_x, px_y)
+
+        # 5. 复制色值成功浮动提示 (Toast)
+        import time
+        if self._copied_toast_text and (time.time() - self._copied_toast_tick < 1.6):
+            t_w, t_h = 200, 36
+            t_x = (self.width() - t_w) // 2
+            t_y = 60
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(16, 185, 129, 235))
+            painter.drawRoundedRect(QRect(t_x, t_y, t_w, t_h), 18, 18)
+            painter.setPen(QColor("#ffffff"))
+            painter.setFont(QFont("Segoe UI", 11, QFont.Bold))
+            painter.drawText(QRect(t_x, t_y, t_w, t_h), Qt.AlignCenter, self._copied_toast_text)
+
         painter.end()
+
+    def _draw_magnifier(self, painter: QPainter, cx: int, cy: int):
+        """绘制实时高倍网格放大镜与 RGB/HEX 像素分析面板"""
+        cur_col = self._full_image.pixelColor(cx, cy)
+        hex_str = cur_col.name(QColor.HexRgb).upper()
+        rgb_str = f"RGB({cur_col.red()}, {cur_col.green()}, {cur_col.blue()})"
+
+        box_w = 152
+        box_h = 176
+        # 放大镜随鼠标微移，靠近边缘自适应翻转
+        offset_x = 18
+        offset_y = 18
+        bx = cx + offset_x
+        by = cy + offset_y
+        if bx + box_w > self.width() - 8:
+            bx = cx - box_w - offset_x
+        if by + box_h > self.height() - 8:
+            by = cy - box_h - offset_y
+        bx = max(8, bx)
+        by = max(8, by)
+
+        # 放大镜主框阴影与背景
+        box_rect = QRect(bx, by, box_w, box_h)
+        painter.setPen(QPen(QColor("#38bdf8"), 1.5))
+        painter.setBrush(QColor(23, 23, 33, 240))
+        painter.drawRoundedRect(box_rect, 8, 8)
+
+        # 放大镜像素网格 (9x9 采样，放大单像素为 11x11)
+        grid_r = 4  # -4 到 +4 共 9 个像素
+        cell_size = 11
+        grid_w = (grid_r * 2 + 1) * cell_size  # 99 px
+        gx = bx + (box_w - grid_w) // 2
+        gy = by + 8
+
+        # 绘制像素网格
+        for dy in range(-grid_r, grid_r + 1):
+            for dx in range(-grid_r, grid_r + 1):
+                sx = cx + dx
+                sy = cy + dy
+                if 0 <= sx < self._full_image.width() and 0 <= sy < self._full_image.height():
+                    c = self._full_image.pixelColor(sx, sy)
+                else:
+                    c = QColor(0, 0, 0)
+                cell_rect = QRect(gx + (dx + grid_r) * cell_size, gy + (dy + grid_r) * cell_size, cell_size, cell_size)
+                painter.setPen(QPen(QColor(40, 44, 58), 1))
+                painter.setBrush(c)
+                painter.drawRect(cell_rect)
+
+        # 中心十字准星 (锁定当前悬停像素)
+        center_rect = QRect(gx + grid_r * cell_size, gy + grid_r * cell_size, cell_size, cell_size)
+        painter.setPen(QPen(QColor("#ef4444"), 1.8))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRect(center_rect)
+
+        # 色样预览长条
+        swatch_rect = QRect(bx + 10, gy + grid_w + 6, box_w - 20, 14)
+        painter.setPen(QPen(QColor(255, 255, 255, 120), 1))
+        painter.setBrush(cur_col)
+        painter.drawRoundedRect(swatch_rect, 3, 3)
+
+        # 色值与坐标文字信息
+        text_y = swatch_rect.bottom() + 14
+        painter.setFont(QFont("Consolas", 9, QFont.Bold))
+        painter.setPen(QColor("#38bdf8"))
+        painter.drawText(bx + 10, text_y, hex_str)
+
+        painter.setFont(QFont("Segoe UI", 8))
+        painter.setPen(QColor("#cbd5e1"))
+        painter.drawText(bx + 10, text_y + 13, rgb_str)
+
+        painter.setPen(QColor("#94a3b8"))
+        painter.drawText(bx + 10, text_y + 25, f"X:{cx}  Y:{cy}  [C]复制")
 
 
 def _qpixmap_to_pil(pix: QPixmap) -> Image.Image:
@@ -408,7 +530,7 @@ def _pil_to_qpixmap(im: Image.Image) -> QPixmap:
     return QPixmap.fromImage(qimg.copy())
 
 
-def find_vertical_overlap(top_img: Image.Image, bottom_img: Image.Image, min_overlap: int = 20, max_overlap: Optional[int] = None) -> int:
+def find_vertical_overlap(top_img: Image.Image, bottom_img: Image.Image, min_overlap: int = 15, max_overlap: Optional[int] = None) -> int:
     """计算连续滚动截图在垂直方向上的重合行高"""
     from PIL import ImageChops, ImageStat
     if top_img.size[0] != bottom_img.size[0]:
@@ -417,35 +539,68 @@ def find_vertical_overlap(top_img: Image.Image, bottom_img: Image.Image, min_ove
     h1 = top_img.size[1]
     h2 = bottom_img.size[1]
     if max_overlap is None:
-        max_overlap = min(h1, h2) - 10
+        max_overlap = min(h1, h2) - 5
     if max_overlap <= min_overlap:
         return 0
 
     best_overlap = 0
     best_diff = 999999.0
 
-    step = 2 if (max_overlap - min_overlap) < 300 else 4
-    for h in range(min_overlap, max_overlap, step):
+    step = 1 if (max_overlap - min_overlap) < 300 else 2
+    for h in range(max_overlap, min_overlap - 1, -step):
         strip1 = top_img.crop((0, h1 - h, w, h1))
         strip2 = bottom_img.crop((0, 0, w, h))
         diff = ImageChops.difference(strip1, strip2)
         stat = ImageStat.Stat(diff)
         avg = sum(stat.mean)
-        if avg < 1.0:
+        if avg < 2.0:
             return h
         if avg < best_diff:
             best_diff = avg
             best_overlap = h
 
-    if best_diff < 5.0:
+    if best_diff < 8.0:
         return best_overlap
     return 0
 
 
-def stitch_long_screenshot(pixmaps: List[QPixmap]) -> QPixmap:
+def find_horizontal_overlap(left_img: Image.Image, right_img: Image.Image, min_overlap: int = 15, max_overlap: Optional[int] = None) -> int:
+    """计算横向拼接时的水平重合列宽"""
+    from PIL import ImageChops, ImageStat
+    if left_img.size[1] != right_img.size[1]:
+        return 0
+    w1, h = left_img.size[0], left_img.size[1]
+    w2 = right_img.size[0]
+    if max_overlap is None:
+        max_overlap = min(w1, w2) - 5
+    if max_overlap <= min_overlap:
+        return 0
+
+    best_overlap = 0
+    best_diff = 999999.0
+    step = 1 if (max_overlap - min_overlap) < 300 else 2
+    for w in range(max_overlap, min_overlap - 1, -step):
+        strip1 = left_img.crop((w1 - w, 0, w1, h))
+        strip2 = right_img.crop((0, 0, w, h))
+        diff = ImageChops.difference(strip1, strip2)
+        stat = ImageStat.Stat(diff)
+        avg = sum(stat.mean)
+        if avg < 2.0:
+            return w
+        if avg < best_diff:
+            best_diff = avg
+            best_overlap = w
+    if best_diff < 8.0:
+        return best_overlap
+    return 0
+
+
+def stitch_screenshots(pixmaps: List[QPixmap], direction: str = "vertical", auto_overlap: bool = True) -> QPixmap:
     """
-    长截图垂直智能无缝拼接
-    支持将多段连续滚动截取的画面按垂直方向自动识别重合边界并消除重复区域合成一体化长图。
+    智能多向长截图无缝拼接引擎
+    :param pixmaps: 待拼接的多段 QPixmap
+    :param direction: 'vertical' (垂直长图) 或 'horizontal' (水平长图)
+    :param auto_overlap: 是否开启特征重叠区消除
     """
     if not pixmaps:
         return QPixmap()
@@ -456,29 +611,54 @@ def stitch_long_screenshot(pixmaps: List[QPixmap]) -> QPixmap:
         pil_images = [_qpixmap_to_pil(p) for p in pixmaps]
         stitched = pil_images[0]
 
-        for next_img in pil_images[1:]:
-            # 保证宽度一致
-            if next_img.size[0] != stitched.size[0]:
-                next_img = next_img.resize((stitched.size[0], int(next_img.size[1] * stitched.size[0] / next_img.size[0])), Image.Resampling.LANCZOS)
-
-            overlap_h = find_vertical_overlap(stitched, next_img)
-            new_h = stitched.size[1] + next_img.size[1] - overlap_h
-            new_canvas = Image.new("RGBA", (stitched.size[0], new_h), (0, 0, 0, 0))
-            new_canvas.paste(stitched, (0, 0))
-            new_canvas.paste(next_img, (0, stitched.size[1] - overlap_h))
-            stitched = new_canvas
+        if direction == "horizontal":
+            for next_img in pil_images[1:]:
+                overlap_w = find_horizontal_overlap(stitched, next_img) if auto_overlap else 0
+                max_h = max(stitched.size[1], next_img.size[1])
+                new_w = stitched.size[0] + next_img.size[0] - overlap_w
+                new_canvas = Image.new("RGBA", (new_w, max_h), (0, 0, 0, 0))
+                new_canvas.paste(stitched, (0, 0))
+                new_canvas.paste(next_img, (stitched.size[0] - overlap_w, 0))
+                stitched = new_canvas
+        else:
+            for next_img in pil_images[1:]:
+                overlap_h = find_vertical_overlap(stitched, next_img) if auto_overlap else 0
+                max_w = max(stitched.size[0], next_img.size[0])
+                new_h = stitched.size[1] + next_img.size[1] - overlap_h
+                new_canvas = Image.new("RGBA", (max_w, new_h), (0, 0, 0, 0))
+                new_canvas.paste(stitched, (0, 0))
+                new_canvas.paste(next_img, (0, stitched.size[1] - overlap_h))
+                stitched = new_canvas
 
         return _pil_to_qpixmap(stitched)
     except Exception:
-        # 回退至平铺模式
-        total_w = max(p.width() for p in pixmaps)
-        total_h = sum(p.height() for p in pixmaps)
-        combined = QPixmap(total_w, total_h)
-        combined.fill(Qt.transparent)
-        painter = QPainter(combined)
-        current_y = 0
-        for p in pixmaps:
-            painter.drawPixmap(0, current_y, p)
-            current_y += p.height()
-        painter.end()
-        return combined
+        # 异常容错：基础平铺拼接
+        if direction == "horizontal":
+            total_w = sum(p.width() for p in pixmaps)
+            max_h = max(p.height() for p in pixmaps)
+            combined = QPixmap(total_w, max_h)
+            combined.fill(Qt.transparent)
+            painter = QPainter(combined)
+            cur_x = 0
+            for p in pixmaps:
+                painter.drawPixmap(cur_x, 0, p)
+                cur_x += p.width()
+            painter.end()
+            return combined
+        else:
+            total_w = max(p.width() for p in pixmaps)
+            total_h = sum(p.height() for p in pixmaps)
+            combined = QPixmap(total_w, total_h)
+            combined.fill(Qt.transparent)
+            painter = QPainter(combined)
+            current_y = 0
+            for p in pixmaps:
+                painter.drawPixmap(0, current_y, p)
+                current_y += p.height()
+            painter.end()
+            return combined
+
+
+def stitch_long_screenshot(pixmaps: List[QPixmap], direction: str = "vertical") -> QPixmap:
+    """向后兼容的垂直/通用长截图拼接入口"""
+    return stitch_screenshots(pixmaps, direction=direction, auto_overlap=True)

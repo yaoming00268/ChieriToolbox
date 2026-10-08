@@ -221,10 +221,19 @@ class LocalCloudHttpHandler(BaseHTTPRequestHandler):
                 text = raw_body
 
             try:
-                import pyperclip
-                pyperclip.copy(text)
+                from PySide6.QtGui import QGuiApplication
+                app = QGuiApplication.instance()
+                if app:
+                    app.clipboard().setText(text)
+                else:
+                    import pyperclip
+                    pyperclip.copy(text)
             except Exception:
-                pass
+                try:
+                    import pyperclip
+                    pyperclip.copy(text)
+                except Exception:
+                    pass
 
             self._send_json(200, {"ok": True, "status": "ok", "message": "剪贴板已同步至电脑"})
         else:

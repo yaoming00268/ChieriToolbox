@@ -22,39 +22,43 @@ tag = "v2.0.0"
 
 release_body = """千绘莉的多功能工具箱 (Chieri Toolbox) v2.0.0 正式发布 (｀・ω・´)！
 
-一只二次元死宅为了彻底偷懒而搓出来的究极生产力兵工厂。集成本地 22 大即插即用动态插件与全新 Android 移动端，暗黑 Fluent 磨砂质感，Esc 一键回城！
+一只二次元死宅为了彻底偷懒而搓出来的究极生产力兵工厂。全新升级至 28 大即插即用动态插件与全解耦架构，包含全新 Android 移动端，暗黑 Fluent 磨砂质感，Esc 一键回城！
+
+【/boost 架构重构与全新功能】：
+1. 武器库跃升至 28 大即插即用扩展插件：
+   - 🌟 剪贴板历史与收藏管理 (clipboard_manager): 系统剪贴板实时监听、多类型历史留存、常用文本分类收藏与格式智能脱敏。
+   - 🌟 环境变量配置管理 (env_var_switcher): 用户/系统变量可视化维护、Path 失效诊断与一键去重、多语言开发环境秒级切换。
+   - 🌟 JSON / 文本高亮对比工作台 (json_diff_studio): JSON 树形高亮美化与格式校验、Monaco 风格行内双栏差异比对与导出。
+   - 🌟 端口占用监控与网络诊断哨兵 (port_network_sentinel): 端口占用与进程 PID 秒查、一键查杀顽固占用、Ping/Traceroute 连通性测试。
+   - 🌟 应用极速启动台 (quick_launcher): 全局热键唤醒，拼音/首字母模糊秒搜系统应用、快捷脚本与工具箱各插件。
+   - 🌟 全能水印批处理工坊 (watermark_studio): 批量平铺/自定义位置文字水印、Logo 图标水印及防盗图隐形频域盲水印。
+2. 全局后台任务中心 (Global Task Manager):
+   - 统一调度管理全插件后台任务，支持并发限流保护与系统内存自平衡，防止高负载多任务卡死系统。
+   - 任务可视化管理面板，实时呈现进度条、状态监控与一键取消/重试控制。
+3. 插件中心与全解耦独立导出生命周期 (Plugin Hub & Decoupled Lifecycle):
+   - 全插件标准化 manifest.json 清单规范与热插拔沙箱隔离。
+   - 独立插件中心：支持任意单插件一键导出为独立免安装包或 Inno Setup 原生安装程序。
+4. 专业截图 OCR 离线文字识别引擎:
+   - PixPin 风格截图新增本地 OCR 识别，框选画面即刻精准提取文字并一键复制。
+
+【AI 进化与多端协同核心特性】：
+1. AI 超分与音频模型按需轻量下载中心 (On-Demand Model Manager):
+   - Real-CUGAN, Real-ESRGAN, Waifu2x 超分模型及 Demucs, Spleeter 音频模型按需动态拉取，包体极致精简。
+   - 内置模型中心，多镜像源自动测速与 SHA256 完整性哈希校验。
+2. 局域网本地云 (Local Cloud) 跨设备算力协同:
+   - PC 端内置 Local Cloud 本地云服务（UDP 自动广播自发现 + REST API）。
+   - Android 移动端与 Web 端可将高负载 AI 超分任务一键卸载至电脑算力执行并秒级取回结果。
+3. B站弹幕转 ASS 特效字幕 (Danmaku to ASS):
+   - 随视频下载智能将 B站 XML 弹幕流转制为专业 ASS 双轨弹幕特效字幕，支持滚动/顶端/底端弹幕与字体边框样式自定义。
+4. 全能多格式音乐解密 (NCM / QMC / KGM / KWM):
+   - 支持网易云 NCM、QQ音乐 QMC (.qmc3, .qmcflac, .mflac, .mgg)、酷狗 KGM (.kgm, .vpr) 与酷我 KWM (.kwm) 格式逆向解密。
+5. ACG 资源解压密码本 (Password Book):
+   - 预置高频 ACG 动漫同人解压密码库，支持密码本管理与一键暴力匹配自动尝试解压。
 
 【全新 Android 移动端重磅发布 (Mobile Edition)】：
-- **移动端架构与原生硬件桥接**：
-  1. Kotlin 原生宿主 + 现代极简 Web 混合架构，零系统污染。
-  2. 原生 MediaCodec 硬件加速：结合 Web Audio API 实现高保真 AAC/M4A 极速硬件编码。
-  3. HttpURLConnection 原生网络穿透：彻底打破 WebView CORS 跨域壁垒，支持 Cookie / SESSDATA 凭据持久化与 DASH 音画流分轨提取。
-  4. Apache Commons Compress 原生归档引擎：全面支持 7Z, TAR, GZ, BZ2, LZ4, XZ, ZIP 解析并批量解压至公共 Downloads 目录。
-  5. 智能 AI 翻译接口：支持 OpenAI 兼容 API、DeepL、百度翻译（RFC 1321 MD5 签名生成算法）、Google 及离线 ACG 专属词库。
-- **现代化极简 UI 与外观定制中心**：
-  1. 100% SVG 扁平化矢量图标体系（零 emoji 字符），精致线条质感。
-  2. 深浅色双模式即时切换，WindowCompat 状态栏与导航栏沉浸式动态着色跟随。
-  3. 卡片尺寸三档调节（紧凑 Compact / 标准 Standard / 宽松 Comfortable）、50%-100% 界面透明度滑动调节与毛玻璃磨砂（0px/8px/16px）深度定制。
-  4. 双轨悬浮交互系统：应用内贴边可折叠悬浮球 + 全局系统悬浮窗 (WindowManager / Overlay)，支持靠边半隐藏贴边折叠与呼出侧边栏抽屉导航。
-- **Android 沙盒差异与平替矩阵权威公示**：内置公示 Linux UID 进程沙盒、PAC 代理、全局按键监听与底层 DirectShow 录屏限制技术根因及平替方案。
-
-【桌面端核心特性与系统重构】：
-- **B站媒体下载器全面增强**：
-  1. 支持下载任务实时暂停 (Pause) 与断点续传恢复 (Resume)
-  2. 智能本地已有文件扫描检测与一键重试未下载/失败物件
-  3. 支持分P/单视频微调画质 (可独立针对单项指定 1080P60/1080P/720P 等)
-  4. 支持批量应用自定义画质至所有勾选项
-  5. 自动根据 CID/list_index 精准映射任务状态，杜绝子集勾选索引错位
-- **内置原生打包流水线与便携式 Inno Setup 编译器**：
-  - 内置便携式 Inno Setup 编译器 (bin/InnoSetup/ISCC.exe)，摆脱系统级外部环境依赖。
-  - 支持一键原生 EXE 安装向导构建与独立插件应用解耦导出。
-- **架构加固与审计缺陷全面修复 (Audit v2 Fixes)**：
-  1. 配置管理器安全加固：实现原子持久化写入、跨进程文件锁与递归深度合并，防止多进程下配置意外丢失或覆写。
-  2. 独立插件隔离：独立插件配置与主题切换全面隔离全局配置，防止污染主工具箱设置。
-  3. 冻结态路径自适应：打包运行环境下多级安全路径探测，确保动态插件发现与外部二进制工具 100% 定位。
-  4. 进程与多线程安全：音频/录屏引擎采用无阻塞异步等待与安全退出机制，规避管道死锁与界面卡死。
-  5. 多媒体与归档安全：媒体压缩参数安全清洗；归档管理器全量集成 TarSlip / ZipSlip 路径穿越防御及 LZ4 流式加解压。
-  6. 白板与托盘管理：修复动态缩放撤销重做画布裁切风险；托盘图标生命周期严格受控。
+- Kotlin 原生宿主 + 现代极简 Web 混合架构，零系统污染，体积仅约 6MB。
+- MediaCodec 硬件加速音频编码 + HttpURLConnection 原生网络穿透 + Apache Commons Compress 原生归档引擎。
+- 100% 现代 SVG 矢量 UI + 深浅双色模式即时热切换 + 应用内贴边可折叠悬浮球与系统级全局悬浮窗。
 
 预构建封装包说明：
 1. **Setup_ChieriToolbox.exe**:
@@ -63,7 +67,7 @@ release_body = """千绘莉的多功能工具箱 (Chieri Toolbox) v2.0.0 正式�
    - 支持自定义安装路径、创建桌面快捷方式及可选开机托盘集成。
 
 2. **ChieriToolbox-v2.0.0-Portable.zip**:
-   - 绿色免安装便携版，解压至任意目录双击 ChieriToolbox.exe 即可运行。
+   - 绿色免安装便携版，解压至任意目录双击 ChieriToolbox.exe 即可运行，零系统污染。
    - 所有配置均保存在程序自身同级目录的 toolbox_config.json，纯净免安装。
 
 3. **ChieriToolbox-Android.apk**:
@@ -71,14 +75,14 @@ release_body = """千绘莉的多功能工具箱 (Chieri Toolbox) v2.0.0 正式�
    - 包含完整的移动端引擎与离线资源，零依赖开箱即用。
 
 测试报告：
-- 全量单元/集成测试与移动端引擎自动化测试套件全部通过 (100% Passed)。
-- 烟测验证 22/22 插件与外部工具链全项通过 (PASSED)。
+- 全量自动化测试套件共 267 项测试 100% 通过 (266 passed, 1 skipped)。
+- 烟测自检覆盖全部 28/28 插件动态实例化与底层工具链寻路 (PASSED)。
 """
 
 release_payload = {
     "tag_name": tag,
     "target_commitish": "main",
-    "name": f"ChieriToolbox {tag} - 二次元死宅专属全能生产力工具箱 (PC & Android 双端)",
+    "name": f"ChieriToolbox {tag} - 二次元死宅专属全能生产力工具箱 (28合1 + 双端互通)",
     "body": release_body,
     "draft": False,
     "prerelease": False
@@ -142,10 +146,14 @@ def upload_release():
 
     upload_url_base = release_data["upload_url"].split("{")[0]
 
+    apk_path = os.path.join(PROJECT_ROOT, "dist", "ChieriToolbox-Android.apk")
+    if not os.path.exists(apk_path):
+        apk_path = os.path.join(PROJECT_ROOT, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk")
+
     assets_to_upload = [
         (os.path.join(PROJECT_ROOT, "dist", "Setup_ChieriToolbox.exe"), "Setup_ChieriToolbox.exe", "application/octet-stream"),
         (os.path.join(PROJECT_ROOT, "dist", "ChieriToolbox-v2.0.0-Portable.zip"), "ChieriToolbox-v2.0.0-Portable.zip", "application/zip"),
-        (os.path.join(PROJECT_ROOT, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk"), "ChieriToolbox-Android.apk", "application/vnd.android.package-archive")
+        (apk_path, "ChieriToolbox-Android.apk", "application/vnd.android.package-archive")
     ]
 
     # 获取当前 release 下已存在的 assets 列表

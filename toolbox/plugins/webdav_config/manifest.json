@@ -1,0 +1,11 @@
+{
+  "id": "webdav_config",
+  "name": "WebDAV 配置管理器",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "网络工具",
+  "description": "集成 OpenList/AList 内核标准的 WebDAV 客户端与存储配置，支持多配置管理、连通性探测、远程文件浏览与网络驱动器一键映射挂载。",
+  "icon": "globe",
+  "sort_order": 40,
+  "entry_point": "plugin.py"
+}

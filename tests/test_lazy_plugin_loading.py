@@ -34,7 +34,7 @@ class TestLazyPluginLoading(unittest.TestCase):
                     "from toolbox.core.plugin_manager import PluginManager; "
                     "pm = PluginManager(); "
                     "pm.discover_and_load(); "
-                    "assert len(pm.get_all_plugins()) == 22, 'Plugins count mismatch'; "
+                    "assert len(pm.get_all_plugins()) == 28, 'Plugins count mismatch'; "
                     "ui_mods = [m for m in sys.modules if m.startswith('toolbox.plugins.') and m.endswith('.ui')]; "
                     "assert len(ui_mods) == 0, f'UI modules loaded during discovery: {ui_mods}'; "
                     "print('CLEAN_DISCOVERY_OK')"
@@ -61,7 +61,7 @@ class TestLazyPluginLoading(unittest.TestCase):
         pm.discover_and_load()
 
         plugins = pm.get_all_plugins()
-        self.assertEqual(len(plugins), 22, "应发现并加载全量 22 个插件")
+        self.assertEqual(len(plugins), 28, "应发现并加载全量 28 个插件")
 
         after_ui_modules = {
             m for m in sys.modules

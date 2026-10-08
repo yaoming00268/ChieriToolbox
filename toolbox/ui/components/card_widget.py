@@ -44,6 +44,16 @@ class PluginCardWidget(QFrame):
 
         self.init_ui()
         self.event_bus.theme_changed.connect(self._on_theme_changed)
+        self.destroyed.connect(self.cleanup)
+
+    def cleanup(self):
+        if getattr(self, "_is_cleaned_up", False):
+            return
+        self._is_cleaned_up = True
+        try:
+            self.event_bus.theme_changed.disconnect(self._on_theme_changed)
+        except Exception:
+            pass
 
     def setVisible(self, visible: bool):
         # 绝不允许作为无父级的独立顶级窗口显示，避免在挂载前被 Win32 提升为独立桌面窗口

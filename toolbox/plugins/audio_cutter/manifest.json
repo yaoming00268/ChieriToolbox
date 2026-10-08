@@ -1,0 +1,11 @@
+{
+  "id": "audio_cutter",
+  "name": "音频精准剪裁",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "音频工具",
+  "description": "微秒/毫秒级精准音频剪裁截取，时间码快速选取，无损/重编码极速导出。",
+  "icon": "scissors",
+  "sort_order": 38,
+  "entry_point": "plugin.py"
+}

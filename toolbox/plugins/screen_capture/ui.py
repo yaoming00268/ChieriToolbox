@@ -19,7 +19,7 @@ from toolbox.core.config_manager import ConfigManager
 from toolbox.ui.icons import get_icon, get_pixmap
 from .capture import (
     grab_fullscreen, grab_window_under_cursor, SnipOverlay,
-    PinnedImageViewer, stitch_long_screenshot
+    PinnedImageViewer, stitch_long_screenshot, stitch_screenshots
 )
 
 
@@ -176,6 +176,112 @@ class XboxCaptureOverlayWidget(QWidget):
                 x = geo.x() + (geo.width() - self.width()) // 2
                 y = geo.y() + 32
                 self.move(x, y)
+
+
+class ScrollCaptureAssistWidget(QWidget):
+    """滚动长截图置顶快速辅助控制条"""
+    def __init__(self, capture_widget: "ScreenCaptureWidget"):
+        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.capture_widget = capture_widget
+        self._drag_pos = None
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(6, 4, 6, 4)
+
+        container = QFrame()
+        container.setStyleSheet("""
+            QFrame {
+                background-color: rgba(23, 23, 33, 0.95);
+                border: 1px solid #3b82f6;
+                border-radius: 16px;
+                padding: 4px 10px;
+            }
+            QPushButton {
+                background-color: #2563eb;
+                color: #ffffff;
+                border: none;
+                border-radius: 8px;
+                padding: 5px 10px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #1d4ed8;
+            }
+            QLabel {
+                color: #e2e8f0;
+                font-size: 12px;
+            }
+        """)
+        c_layout = QHBoxLayout(container)
+        c_layout.setContentsMargins(4, 2, 4, 2)
+        c_layout.setSpacing(8)
+
+        lbl_drag = QLabel(" ⠿ ")
+        lbl_drag.setCursor(Qt.SizeAllCursor)
+        c_layout.addWidget(lbl_drag)
+
+        self.lbl_status = QLabel("长截图助手")
+        self.lbl_status.setStyleSheet("color: #38bdf8; font-weight: bold;")
+        c_layout.addWidget(self.lbl_status)
+
+        btn_capture = QPushButton("捕获下一段")
+        btn_capture.setIcon(get_icon("file-plus", color="#ffffff", size=13))
+        btn_capture.clicked.connect(self._do_capture)
+        c_layout.addWidget(btn_capture)
+
+        btn_finish = QPushButton("完成拼接")
+        btn_finish.setStyleSheet("background-color: #10b981;")
+        btn_finish.setIcon(get_icon("check", color="#ffffff", size=13))
+        btn_finish.clicked.connect(self._do_finish)
+        c_layout.addWidget(btn_finish)
+
+        btn_close = QPushButton("退出")
+        btn_close.setStyleSheet("background-color: #ef4444;")
+        btn_close.clicked.connect(self._do_close)
+        c_layout.addWidget(btn_close)
+
+        layout.addWidget(container)
+        self.resize(380, 52)
+        self._update_label()
+
+    def _update_label(self):
+        count = len(self.capture_widget.long_segments)
+        self.lbl_status.setText(f"已捕获 {count} 段")
+
+    def _do_capture(self):
+        self.hide()
+        QTimer.singleShot(250, self._step_capture)
+
+    def _step_capture(self):
+        pix = grab_fullscreen()
+        if not pix.isNull():
+            self.capture_widget.long_segments.append(pix)
+            self.capture_widget.lbl_long_info.setText(f"已捕获 {len(self.capture_widget.long_segments)} 段画面")
+            self.capture_widget.btn_finish_long.setEnabled(True)
+        self.show()
+        self.raise_()
+        self._update_label()
+
+    def _do_finish(self):
+        self.hide()
+        if self.capture_widget.window():
+            self.capture_widget.window().showNormal()
+        self.capture_widget._finish_long_snip()
+
+    def _do_close(self):
+        self.hide()
+        if self.capture_widget.window():
+            self.capture_widget.window().showNormal()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.LeftButton and self._drag_pos:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
 
 
 class ScreenCaptureWidget(QWidget):
@@ -430,6 +536,18 @@ class ScreenCaptureWidget(QWidget):
         self.btn_clear_long.setIcon(get_icon("trash", size=13))
         self.btn_clear_long.clicked.connect(self._clear_long_segments)
         long_action_row.addWidget(self.btn_clear_long)
+
+        self.btn_import_segments = QPushButton("批量导入分段图片...")
+        self.btn_import_segments.setIcon(get_icon("folder", size=13))
+        self.btn_import_segments.clicked.connect(self._import_long_segments)
+        long_action_row.addWidget(self.btn_import_segments)
+
+        self.btn_assist_long = QPushButton("滚动悬浮助手")
+        self.btn_assist_long.setIcon(get_icon("monitor", size=13))
+        self.btn_assist_long.setToolTip("打开极简置顶长截图悬浮条，可边滚动网页/文档边便捷截取")
+        self.btn_assist_long.clicked.connect(self._open_scroll_assist)
+        long_action_row.addWidget(self.btn_assist_long)
+
         long_action_row.addStretch()
         l_long.addLayout(long_action_row)
 
@@ -573,6 +691,16 @@ class ScreenCaptureWidget(QWidget):
         self.btn_copy_selected.clicked.connect(self._copy_selected_history)
         row_h_act.addWidget(self.btn_copy_selected)
 
+        self.btn_ocr_selected = QPushButton("识字 (OCR)")
+        self.btn_ocr_selected.setIcon(get_icon("search", size=13))
+        self.btn_ocr_selected.clicked.connect(self._ocr_selected_history)
+        row_h_act.addWidget(self.btn_ocr_selected)
+
+        self.btn_qr_selected = QPushButton("扫码解析")
+        self.btn_qr_selected.setIcon(get_icon("sparkles", size=13))
+        self.btn_qr_selected.clicked.connect(self._qr_selected_history)
+        row_h_act.addWidget(self.btn_qr_selected)
+
         self.btn_open_dir = QPushButton("打开保存目录")
         self.btn_open_dir.setIcon(get_icon("folder", size=13))
         self.btn_open_dir.clicked.connect(self._open_save_dir)
@@ -631,7 +759,8 @@ class ScreenCaptureWidget(QWidget):
 
     def _do_rectangular_snip(self):
         full_pix = grab_fullscreen()
-        overlay = SnipOverlay(full_pix, on_finish=self._handle_capture_result)
+        show_mag = self.cb_rect_magnifier.isChecked() if hasattr(self, "cb_rect_magnifier") else True
+        overlay = SnipOverlay(full_pix, on_finish=self._handle_capture_result, show_magnifier=show_mag)
         overlay.destroyed.connect(self._on_snip_overlay_closed)
         overlay.show()
 
@@ -711,7 +840,9 @@ class ScreenCaptureWidget(QWidget):
     def _finish_long_snip(self):
         if not self.long_segments:
             return
-        combined = stitch_long_screenshot(self.long_segments)
+        direction = "horizontal" if hasattr(self, "combo_long_dir") and self.combo_long_dir.currentIndex() == 1 else "vertical"
+        auto_overlap = self.cb_long_overlap.isChecked() if hasattr(self, "cb_long_overlap") else True
+        combined = stitch_screenshots(self.long_segments, direction=direction, auto_overlap=auto_overlap)
         self.long_segments.clear()
         self.lbl_long_info.setText("已捕获 0 段画面")
         self.btn_finish_long.setEnabled(False)
@@ -721,6 +852,33 @@ class ScreenCaptureWidget(QWidget):
         self.long_segments.clear()
         self.lbl_long_info.setText("已捕获 0 段画面")
         self.btn_finish_long.setEnabled(False)
+
+    def _import_long_segments(self):
+        """从本地文件系统中批量选择图片作为连续长截图分段"""
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "批量导入长截图分段图片", "",
+            "图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*.*)"
+        )
+        if paths:
+            loaded_count = 0
+            for p in paths:
+                pix = QPixmap(p)
+                if not pix.isNull():
+                    self.long_segments.append(pix)
+                    loaded_count += 1
+            if loaded_count > 0:
+                self.lbl_long_info.setText(f"已捕获/导入 {len(self.long_segments)} 段画面")
+                self.btn_finish_long.setEnabled(True)
+
+    def _open_scroll_assist(self):
+        """打开置顶极简长截图悬浮条，方便用户滚动页面操作"""
+        if not hasattr(self, "_scroll_assist") or not self._scroll_assist:
+            self._scroll_assist = ScrollCaptureAssistWidget(self)
+        if self.window():
+            self.window().showMinimized()
+        self._scroll_assist._update_label()
+        self._scroll_assist.show()
+        self._scroll_assist.raise_()
 
     def _handle_capture_result(self, pixmap: QPixmap, requested_action: str = "copy"):
         """统一处理截图产物：剪贴板 / 保存 / 桌面贴图"""
@@ -753,6 +911,49 @@ class ScreenCaptureWidget(QWidget):
             viewer.closed.connect(lambda v: self.pinned_windows.remove(v) if v in self.pinned_windows else None)
             self.pinned_windows.append(viewer)
             viewer.show()
+
+        # 4. 智能识字 (OCR)
+        if requested_action == "ocr":
+            import tempfile
+            from .ocr_engine import run_windows_native_ocr, OcrResultDialog
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_f:
+                tmp_path = tmp_f.name
+            try:
+                pixmap.save(tmp_path, "PNG")
+                ok, text, lines = run_windows_native_ocr(tmp_path)
+                if ok and text:
+                    dlg = OcrResultDialog(text, lines, parent=self)
+                    dlg.exec()
+                else:
+                    QMessageBox.warning(self, "OCR 提示", f"未能识别出图像文字: {text or '未检测到有效字符'}")
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+
+        # 5. 二维码/条码解析
+        if requested_action == "qr":
+            import tempfile
+            from .ocr_engine import scan_qr_code_from_image
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_f:
+                tmp_path = tmp_f.name
+            try:
+                pixmap.save(tmp_path, "PNG")
+                ok, result_str = scan_qr_code_from_image(tmp_path)
+                if ok:
+                    cb = QGuiApplication.clipboard()
+                    cb.setText(result_str)
+                    QMessageBox.information(self, "二维码解析成功", f"解析结果 (已复制到剪贴板):\n\n{result_str}")
+                else:
+                    QMessageBox.warning(self, "扫码提示", f"未能识别到有效二维码: {result_str}")
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
 
         # 记录到历史
         file_size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
@@ -807,6 +1008,44 @@ class ScreenCaptureWidget(QWidget):
         if pix:
             QGuiApplication.clipboard().setPixmap(pix)
             QMessageBox.information(self, "已复制", "选中的截图已复制到系统剪贴板。")
+
+    def _ocr_selected_history(self):
+        rows = self.table_hist.selectionModel().selectedRows()
+        if not rows:
+            QMessageBox.information(self, "提示", "请先在历史记录列表中选中一张截图。")
+            return
+        item = self.table_hist.item(rows[0].row(), 0)
+        data = item.data(Qt.UserRole)
+        path = data.get("path", "")
+        if path and os.path.exists(path):
+            from .ocr_engine import run_windows_native_ocr, OcrResultDialog
+            ok, text, lines = run_windows_native_ocr(path)
+            if ok and text:
+                dlg = OcrResultDialog(text, lines, parent=self)
+                dlg.exec()
+            else:
+                QMessageBox.warning(self, "OCR 结果", f"未能识别出文本: {text or '无有效字符'}")
+        else:
+            QMessageBox.warning(self, "错误", "未找到对应的截图文件。")
+
+    def _qr_selected_history(self):
+        rows = self.table_hist.selectionModel().selectedRows()
+        if not rows:
+            QMessageBox.information(self, "提示", "请先在历史记录列表中选中一张截图。")
+            return
+        item = self.table_hist.item(rows[0].row(), 0)
+        data = item.data(Qt.UserRole)
+        path = data.get("path", "")
+        if path and os.path.exists(path):
+            from .ocr_engine import scan_qr_code_from_image
+            ok, result_str = scan_qr_code_from_image(path)
+            if ok:
+                QGuiApplication.clipboard().setText(result_str)
+                QMessageBox.information(self, "二维码解析成功", f"解析内容 (已复制到剪贴板):\n\n{result_str}")
+            else:
+                QMessageBox.warning(self, "扫码结果", f"未能识别到二维码: {result_str}")
+        else:
+            QMessageBox.warning(self, "错误", "未找到对应的截图文件。")
 
     def _open_save_dir(self):
         d = self.le_save_dir.text().strip()

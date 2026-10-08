@@ -15,6 +15,7 @@ class ScreenCapturePlugin(PluginBase):
     version = "1.0.0"
     author = "Chieri"
     sort_order = 21
+    supported_outputs = ["image/*", "text/plain"]
 
     def create_widget(self, parent: QWidget = None) -> QWidget:
         from .ui import ScreenCaptureWidget

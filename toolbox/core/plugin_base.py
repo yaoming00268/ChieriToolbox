@@ -26,11 +26,16 @@ class PluginBase(QObject):
     version: str = "1.0.0"
     author: str = "Chieri"
     sort_order: int = 100  # 首页排序优先级（越小越靠前）
+    is_builtin: bool = True  # 标识是否为内核预置插件 (False 为外部扩展插件)
+    supported_inputs: list = []  # 支持接收的数据类型 (例如: ["image/*", "text/plain", "file/*"])
+    supported_outputs: list = []  # 支持输出的数据类型 (例如: ["image/*", "text/plain"])
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._widget: Optional[QWidget] = None
         self._is_active: bool = False
+        self._plugin_dir: Optional[str] = None
+        self.manifest: Optional[dict] = None
 
     @abstractmethod
     def create_widget(self, parent: Optional[QWidget] = None) -> QWidget:
@@ -108,6 +113,25 @@ class PluginBase(QObject):
         except Exception as e:
             print(f"[Plugin {self.id}] 处理初始路径失败: {e}")
 
+    def accept_pipeline_data(self, data_type: str, data: any) -> bool:
+        """
+        跨插件数据流转管道：接收其他插件送入的数据。
+        data_type: MIME 类型，例如 "image/*", "text/plain", "file/*"
+        data: 具体数据对象 (例如 PIL Image / QPixmap / str / list[str])
+        """
+        try:
+            widget = self.get_widget()
+            if widget and hasattr(widget, "accept_pipeline_data"):
+                return bool(widget.accept_pipeline_data(data_type, data))
+            # 兼容性回退：若传入的是文件路径或路径列表，回退调用 handle_initial_paths
+            if data_type.startswith("file") or isinstance(data, (list, tuple)) or (isinstance(data, str) and os.path.exists(data)):
+                paths = data if isinstance(data, list) else [data]
+                self.handle_initial_paths(paths)
+                return True
+        except Exception as e:
+            print(f"[Plugin {self.id}] 管道数据接收失败: {e}")
+        return False
+
     def cleanup(self):
         """
         生命周期钩子：当工具箱退出或插件被卸载时调用，用于释放持久句柄与资源。
@@ -129,8 +153,66 @@ class PluginBase(QObject):
                     self._widget.cleanup()
                 except Exception:
                     pass
-            self._widget.deleteLater()
+            # 优雅终止可能仍在执行的 QThread 子线程，杜绝 QThread: Destroyed while thread is still running 崩溃
+            try:
+                from PySide6.QtCore import QThread
+                for th in self._widget.findChildren(QThread):
+                    try:
+                        if th.isRunning():
+                            th.quit()
+                            if not th.wait(300):
+                                th.terminate()
+                                th.wait(100)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                self._widget.setParent(None)
+                self._widget.deleteLater()
+            except (RuntimeError, Exception):
+                pass
             self._widget = None
+
+    def teardown(self):
+        """
+        生命周期钩子：当插件被动态热卸载、停用或物理删除时安全释放资源。
+        释放 UI 控件、断开 Qt 信号槽、终止工作线程。
+        """
+        self.cleanup()
+
+    def get_file_size(self) -> int:
+        """计算插件所在的目录磁盘占用总大小 (字节数)"""
+        p_dir = self.get_plugin_dir()
+        if not p_dir or not os.path.exists(p_dir):
+            return 0
+        total_size = 0
+        try:
+            for root, _, files in os.walk(p_dir):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    if os.path.isfile(fp):
+                        total_size += os.path.getsize(fp)
+        except Exception:
+            pass
+        return total_size
+
+    def get_manifest(self) -> dict:
+        """获取或生成插件标准 manifest 元数据字典"""
+        if self.manifest and isinstance(self.manifest, dict):
+            return dict(self.manifest)
+        return {
+            "id": self.id,
+            "name": self.name,
+            "version": self.version,
+            "author": self.author,
+            "category": self.category,
+            "description": self.description,
+            "icon": self.icon,
+            "sort_order": self.sort_order,
+            "is_builtin": self.is_builtin,
+            "size_bytes": self.get_file_size(),
+        }
 
     def load_config(self) -> dict:
         """从全局配置管理器读取该插件专属配置参数"""
@@ -158,6 +240,8 @@ class PluginBase(QObject):
 
     def get_plugin_dir(self) -> str:
         """获取当前插件所在的根目录"""
+        if getattr(self, "_plugin_dir", None) and os.path.isdir(self._plugin_dir):
+            return self._plugin_dir
         mod = inspect.getmodule(self.__class__)
         if mod and hasattr(mod, "__file__") and mod.__file__:
             return os.path.dirname(os.path.abspath(mod.__file__))
@@ -165,14 +249,19 @@ class PluginBase(QObject):
         return os.path.join(get_app_root(), "toolbox", "plugins", self.id)
 
     def get_icon_path(self) -> str:
-        """获取该插件专属的独立 PNG 图标绝对路径"""
-        p = os.path.join(self.get_plugin_dir(), "icon.png")
-        if os.path.isfile(p):
-            return p
+        """获取该插件专属的独立图标绝对路径 (优先返回 PNG，兼容 SVG/ICO)"""
+        p_dir = self.get_plugin_dir()
+        p_png = os.path.join(p_dir, "icon.png")
+        if os.path.isfile(p_png):
+            return p_png
+        for ext in ("icon.svg", "icon.ico"):
+            candidate = os.path.join(p_dir, ext)
+            if os.path.isfile(candidate):
+                return candidate
         from toolbox.ui.icons import ensure_plugin_icons
-        ensure_plugin_icons(self.id, self.get_plugin_dir())
-        if os.path.isfile(p):
-            return p
+        ensure_plugin_icons(self.id, p_dir)
+        if os.path.isfile(p_png):
+            return p_png
         from toolbox.core.paths import get_app_root
         return os.path.join(get_app_root(), "app_icon.png")
 
@@ -191,7 +280,7 @@ class PluginBase(QObject):
     def get_icon(self, size: int = 24):
         """获取该插件专属的 QIcon 图标"""
         from toolbox.ui.icons import get_plugin_icon
-        return get_plugin_icon(self.id, size=size)
+        return get_plugin_icon(self.id, size=size, plugin_dir=self.get_plugin_dir())
 
 
 

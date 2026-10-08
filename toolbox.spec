@@ -48,6 +48,8 @@ hidden_imports = list(set([
     'yt_dlp',
     'yt_dlp.cookies',
     'sqlite3',
+    'winreg',
+    'ctypes',
 ]))
 
 # 3. 收集必要的数据与资源文件:

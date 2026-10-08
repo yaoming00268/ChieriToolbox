@@ -1,0 +1,11 @@
+{
+  "id": "force_killer",
+  "name": "顽固应用与文件强力粉碎",
+  "version": "1.0.0",
+  "author": "Chieri",
+  "category": "系统增强",
+  "description": "解除顽固文件占用锁并彻底粉碎删除，强制终止卡死顽固进程树与后台服务。",
+  "icon": "shield",
+  "sort_order": 62,
+  "entry_point": "plugin.py"
+}
