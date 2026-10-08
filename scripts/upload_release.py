@@ -9,6 +9,39 @@ import subprocess
 import requests
 import json
 
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+        except Exception:
+            pass
+
+class ProgressFileWrapper:
+    def __init__(self, file_path, total_size, asset_name):
+        self.f = open(file_path, "rb")
+        self.total_size = total_size
+        self.asset_name = asset_name
+        self.uploaded = 0
+        self.last_print = 0
+
+    def read(self, size=-1):
+        chunk = self.f.read(size)
+        if chunk:
+            self.uploaded += len(chunk)
+            if self.uploaded - self.last_print >= 10 * 1024 * 1024 or self.uploaded >= self.total_size:
+                pct = (self.uploaded / self.total_size) * 100
+                mb = self.uploaded / (1024 * 1024)
+                total_mb = self.total_size / (1024 * 1024)
+                print(f"[{self.asset_name}] 上传中: {mb:.1f} MB / {total_mb:.1f} MB ({pct:.1f}%)", flush=True)
+                self.last_print = self.uploaded
+        return chunk
+
+    def __len__(self):
+        return self.total_size
+
+    def close(self):
+        self.f.close()
+
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 if PROJECT_ROOT not in sys.path:
@@ -194,14 +227,17 @@ def upload_release():
             "Content-Length": str(file_size)
         }
 
-        print(f"正在上传 {asset_name} ...")
-        with open(file_path, "rb") as f:
+        print(f"正在上传 {asset_name} ...", flush=True)
+        wrapper = ProgressFileWrapper(file_path, file_size, asset_name)
+        try:
             upload_resp = requests.post(
                 f"{upload_url_base}?name={asset_name}",
                 headers=upload_headers,
-                data=f,
+                data=wrapper,
                 timeout=900
             )
+        finally:
+            wrapper.close()
 
         if upload_resp.status_code in (200, 201):
             asset_info = upload_resp.json()
