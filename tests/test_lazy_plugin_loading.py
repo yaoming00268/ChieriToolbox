@@ -142,8 +142,8 @@ class TestLazyPluginLoading(unittest.TestCase):
         finally:
             cfg.set_plugin_config("screen_capture", orig_sc_cfg)
 
-    def test_05_all_22_plugins_can_be_lazily_loaded_and_navigated(self):
-        """验证全量 22 个插件按需导航时能够正常完成惰性加载并返回有效 Widget"""
+    def test_05_all_28_plugins_can_be_lazily_loaded_and_navigated(self):
+        """验证全量 28 个插件按需导航时能够正常完成惰性加载并返回有效 Widget"""
         from toolbox.ui.main_window import MainWindow
 
         win = MainWindow()

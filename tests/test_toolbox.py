@@ -2323,11 +2323,11 @@ class TestReviewerHardeningAndVerification(unittest.TestCase):
         win.close()
 
     def test_all_plugins_settings_persistence(self):
-        """测试全量 22 个插件均支持 load_settings/load_config 与 save_settings/save_config 独立参数持久化"""
+        """测试全量 28 个插件均支持 load_settings/load_config 与 save_settings/save_config 独立参数持久化"""
         pm = PluginManager()
         pm.discover_and_load()
         plugins = pm.get_all_plugins()
-        self.assertGreaterEqual(len(plugins), 26)
+        self.assertGreaterEqual(len(plugins), 28)
 
         for p in plugins:
             widget = p.create_widget()
@@ -2653,11 +2653,11 @@ class TestStandaloneAndTrayFeatures(unittest.TestCase):
         win.close()
 
     def test_plugin_independent_icons_and_mipmaps(self):
-        """测试全部 22 个插件均具备专属独立的 .ico 与 .png 图标，且包含完整的 6 个 mipmap 尺寸"""
+        """测试全部 28 个插件均具备专属独立的 .ico 与 .png 图标，且包含完整的 6 个 mipmap 尺寸"""
         pm = PluginManager()
         pm.discover_and_load()
         plugins = pm.get_all_plugins()
-        self.assertGreaterEqual(len(plugins), 26)
+        self.assertGreaterEqual(len(plugins), 28)
 
         expected_sizes = {(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)}
 

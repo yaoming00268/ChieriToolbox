@@ -780,7 +780,7 @@ def ensure_plugin_icons(plugin_id: str, plugin_dir: Optional[str] = None) -> Tup
 
 def ensure_all_plugin_icons() -> Dict[str, Tuple[str, str]]:
     """
-    检查并为全部 22 个插件生成并持久化独立的 icon.ico 与 icon.png。
+    检查并为全部 28 个插件生成并持久化独立的 icon.ico 与 icon.png。
     """
     from toolbox.core.paths import get_app_root
     plugins_dir = os.path.join(get_app_root(), "toolbox", "plugins")

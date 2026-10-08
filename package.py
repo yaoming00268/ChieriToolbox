@@ -3,7 +3,7 @@
 内置 Inno Setup 编译组件支持，摆脱对系统级外部 Inno Setup 安装的依赖。
 
 功能架构:
-1. PyInstaller 独立分发打包: 将整个工程及其 22 个插件解耦打包至 dist/ChieriToolbox
+1. PyInstaller 独立分发打包: 将整个工程及其 28 个插件解耦打包至 dist/ChieriToolbox
 2. 自动化打包深度冒烟测试 (Smoke Test): 运行打包出的 ChieriToolbox.exe --smoke-test，验证全量插件与依赖
 3. 绿色免安装便携版归档 (Portable Zip): 高效压缩打包产物至 dist/ChieriToolbox-v2.0.0-Portable.zip
 4. 原生 Inno Setup 安装包构建 (Setup Installer): 使用内置 bin/InnoSetup/ISCC.exe 编译 dist/Setup_ChieriToolbox.exe
@@ -205,9 +205,10 @@ def build_portable_zip(source_dir: Optional[str] = None, output_zip: Optional[st
             "-xr!*.bak",
             "-xr!smoke_test_report.json",
             "-xr!verified_*.png",
-            "-xr!toolbox_config.json",
+            "-xr!toolbox_config.json*",
             "-xr!*.local.json",
-            "-xr!test_*.txt"
+            "-xr!test_*.txt",
+            "-xr!*.lock"
         ]
         try:
             proc = subprocess.run(cmd, cwd=source_dir, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -222,7 +223,7 @@ def build_portable_zip(source_dir: Optional[str] = None, output_zip: Optional[st
 
     # 备用方案: Python zipfile
     import zipfile
-    exclude_patterns = [".log", ".tmp", ".m4s", ".bak", "smoke_test_report.json", "verified_", "toolbox_config.json", ".local.json", "test_"]
+    exclude_patterns = [".log", ".tmp", ".m4s", ".bak", "smoke_test_report.json", "verified_", "toolbox_config.json", ".local.json", "test_", ".lock"]
     with zipfile.ZipFile(output_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for root, dirs, files in os.walk(source_dir):
             dirs[:] = [d for d in dirs if not any(pat in d for pat in exclude_patterns)]

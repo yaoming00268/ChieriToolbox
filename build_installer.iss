@@ -34,7 +34,7 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 Name: "autostart"; Description: "开机自动启动并在系统托盘常驻"; GroupDescription: "系统集成:"; Flags: unchecked
 
 [Files]
-Source: "dist\ChieriToolbox\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.log,*.tmp,*.m4s,*.bak,smoke_test_report.json,verified_*.png,toolbox_config.json,*.local.json,test_*.txt"
+Source: "dist\ChieriToolbox\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.log,*.tmp,*.m4s,*.bak,smoke_test_report.json,verified_*.png,toolbox_config.json*,*.local.json,test_*.txt,*.lock"
 
 [Icons]
 Name: "{group}\千绘莉多功能工具箱"; Filename: "{app}\ChieriToolbox.exe"; IconFilename: "{app}\app_icon.ico"; WorkingDir: "{app}"

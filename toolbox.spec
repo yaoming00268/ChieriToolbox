@@ -13,7 +13,7 @@ block_cipher = None
 # 项目工程根目录绝对路径
 project_dir = os.path.abspath(SPECPATH)
 
-# 1. 递归收集 toolbox 的所有子模块 (包括所有 22 个插件及其 ui、engine、worker、api、parser 等全部组件)
+# 1. 递归收集 toolbox 的所有子模块 (包括所有 28 个插件及其 ui、engine、worker、api、parser 等全部组件)
 toolbox_submodules = collect_submodules('toolbox')
 
 # 2. 收集核心依赖库的动态/隐藏引用，确保冻结环境下各插件功能正常运行
